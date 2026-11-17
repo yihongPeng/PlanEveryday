@@ -1,0 +1,21 @@
+const {_electron:electron}=require('playwright');
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os');
+const root=path.resolve(__dirname,'..'),data=fs.mkdtempSync(path.join(os.tmpdir(),'yaya-experience-'));
+const exe=process.env.PLANEVERYDAY_EXE||require('electron');
+const pause=ms=>new Promise(r=>setTimeout(r,ms));
+(async()=>{const app=await electron.launch({executablePath:exe,args:process.env.PLANEVERYDAY_EXE?[]:[root],env:{...process.env,PLANEVERYDAY_DATA_DIR:data}});const checks=[];try{
+ let page=await app.firstWindow();for(let i=0;i<40;i++){page=app.windows().find(p=>p.url().endsWith('index.html'));if(page)break;await pause(100);}page.setDefaultTimeout(8000);await page.locator('#quick-title').waitFor();
+ const call=(action,data)=>page.evaluate(async({action,data})=>{const r=await window.planner.invoke(action,data);if(!r.ok)throw Error(r.error);return r.data;},{action,data});
+ await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].setBounds({width:360,height:480}));await pause(100);
+ const contentHeight=await page.locator('#content').evaluate(el=>el.clientHeight);assert.ok(contentHeight>=130,`small window list must remain usable, actual ${contentHeight}px`);checks.push('360x480 leaves at least 130px task list');
+ await page.locator('#quick-title').fill('很长的任务标题'.repeat(25));await page.locator('#quick-title').press('Enter');await page.locator('.task-row').waitFor();assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));checks.push('long title does not overflow');
+ await page.locator('#quick-title').fill('输入法确认不是新增');await page.locator('#quick-title').dispatchEvent('compositionstart');await page.locator('#quick-title').press('Enter');assert.equal((await call('snapshot')).tasks.length,1);await page.locator('#quick-title').dispatchEvent('compositionend');checks.push('IME composing Enter suppressed (synthetic composition event)');
+ await page.keyboard.press('Control+f');assert.equal(await page.locator('#search').evaluate(el=>el===document.activeElement),true);await page.keyboard.press('Control+n');assert.equal(await page.locator('#quick-title').evaluate(el=>el===document.activeElement),true);checks.push('Ctrl+F and Ctrl+N focus correct fields');
+ await page.locator('#quick-title').fill('');await page.locator('.task-main').click();await page.locator('[name=notes]').fill('需要保留的备注草稿');
+ await app.evaluate(({dialog})=>{dialog.showMessageBox=async()=>({response:0});});await page.locator('[data-delete]').click();assert.equal((await call('snapshot')).tasks.length,1);checks.push('delete cancel preserves task');
+ page.on('dialog',dialog=>dialog.dismiss().catch(()=>{}));await page.keyboard.press('Escape');assert.equal(await page.locator('[name=notes]').inputValue(),'需要保留的备注草稿');checks.push('cancel discard preserves edit draft');await page.locator('#detail-close').click();
+ await page.emulateMedia({reducedMotion:'reduce'});assert.equal(await page.locator('.task-row').evaluate(el=>getComputedStyle(el).transitionDuration),'0s');checks.push('reduced motion removes transitions');
+ await page.screenshot({path:path.join(root,'test-results','small-360x480.png')});
+ for(const factor of [1.5,2]){await app.evaluate(({BrowserWindow},factor)=>{const w=BrowserWindow.getAllWindows()[0];w.setBounds({width:760,height:960});w.webContents.setZoomFactor(factor);},factor);await pause(150);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));assert.ok(await page.locator('#content').evaluate(el=>el.clientHeight)>=100);}checks.push('150% and 200% page zoom layout (not OS DPI)');
+ fs.writeFileSync(path.join(root,'test-results','experience-report.json'),JSON.stringify({passed:true,checks},null,2));console.log(checks);
+}finally{await app.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

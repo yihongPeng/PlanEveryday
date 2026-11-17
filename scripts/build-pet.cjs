@@ -1,0 +1,17 @@
+const { spawnSync } = require('node:child_process');
+const fs = require('node:fs');
+const path = require('node:path');
+const root = path.resolve(__dirname, '..');
+const output = path.join(root, 'native', 'bin', 'PlanEveryday.Pet.exe');
+if (process.platform !== 'win32') throw new Error('The native pet must be built on Windows.');
+fs.mkdirSync(path.dirname(output), { recursive: true });
+const compiler = path.join(process.env.WINDIR || 'C:\\Windows', 'Microsoft.NET', 'Framework64', 'v4.0.30319', 'csc.exe');
+const result = spawnSync(compiler, ['/nologo', '/optimize+', '/platform:x64', '/target:winexe', '/reference:System.Windows.Forms.dll', '/reference:System.Drawing.dll', '/win32manifest:' + path.join(root, 'native', 'Pet.manifest'), '/out:' + output, path.join(root, 'native', 'Pet.cs')], { stdio: 'inherit', windowsHide: true });
+if (result.error) throw result.error;
+if (result.status !== 0) process.exit(result.status || 1);
+const test = spawnSync(output, ['--self-test'], { encoding: 'utf8', windowsHide: true });
+if (test.error) throw test.error;
+if (test.status !== 0) process.exit(test.status || 1);
+if (!test.stdout.includes('"passed":6')) throw new Error('Native pet self-test output was not received.');
+process.stdout.write(test.stdout);
+console.log('Native pet built: ' + output);

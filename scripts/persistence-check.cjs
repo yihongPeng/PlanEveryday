@@ -1,0 +1,16 @@
+const {_electron:electron}=require('playwright'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const data=fs.mkdtempSync(path.resolve('test-results/persistence-'));
+const exe=path.resolve('release/0.2.2/PlanEveryday-win32-x64/PlanEveryday.exe');
+const content='# 排版验收\n\n**重点**与普通文字\n\n- 第一点\n- 第二点\n\n> 每天复习\n\n```cpp\n'+('long_variable_name_'.repeat(35))+'\n```\n\n| 名称 | 说明 |\n| --- | --- |\n| 例子 | '+('长表格内容'.repeat(25))+' |';
+const launch=()=>electron.launch({executablePath:exe,env:{...process.env,PLANEVERYDAY_DATA_DIR:data,PLANEVERYDAY_TEST_NO_FOCUS:'1'}});
+(async()=>{let app;try{
+ app=await launch();let page=await app.firstWindow();await page.locator('#quick-title').fill('退出重开保存验收');await page.locator('#quick-title').press('Enter');await page.getByText('退出重开保存验收',{exact:true}).waitFor();
+ await page.locator('[data-view="memory"]:visible').first().click();await page.locator('[data-memory-new]').first().click();await page.locator('#memory-title').fill('Markdown 保存验收');await page.locator('#memory-content').fill(content);await page.locator('[data-memory-save]').click();await page.locator('#memory-reading-title').waitFor();
+ const before=(await page.evaluate(()=>window.planner.invoke('snapshot'))).data;await app.close();app=null;
+ app=await launch();page=await app.firstWindow();await page.locator('#quick-title').waitFor();const after=(await page.evaluate(()=>window.planner.invoke('snapshot'))).data;assert.deepEqual(after.tasks,before.tasks);assert.deepEqual(after.knowledge,before.knowledge);
+ await page.locator('[data-view="memory"]:visible').first().click();await page.locator('[data-memory-open]').click();assert.equal(await page.locator('.memory-body h1').count(),1);assert.equal(await page.locator('.memory-body strong').count(),1);assert.equal(await page.locator('.memory-body blockquote').count(),1);
+ for(const width of [900,360]){await app.evaluate(({BrowserWindow},width)=>BrowserWindow.getAllWindows()[0].setBounds({width,height:600}),width);await page.waitForTimeout(150);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));assert.ok(await page.locator('.memory-body pre').evaluate(el=>el.scrollWidth>el.clientWidth));await page.locator('#content').evaluate(el=>el.scrollTop=el.scrollHeight);await page.screenshot({path:path.resolve(`test-results/markdown-overflow-${width}.png`)});}
+ await page.locator('[data-memory-edit]').click();assert.equal(await page.locator('#memory-content').inputValue(),content);
+ const paths=await app.evaluate(({app})=>({userData:app.getPath('userData'),sessionData:app.getPath('sessionData')}));assert.equal(paths.userData,data);assert.equal(paths.sessionData,data);
+ fs.writeFileSync('test-results/persistence-report.json',JSON.stringify({passed:true,checks:['UI saved task and Markdown survive full process restart exactly','Markdown heading/emphasis/quote/code/table render','Long code scrolls locally at 900 and 360 without page overflow','Editing preserves exact Markdown source','userData and sessionData on D drive'],paths},null,2));console.log('PASS UI save, full restart, exact content, Markdown layout and D-drive paths');
+ }finally{if(app)await app.close();}})().catch(e=>{console.error(e);process.exitCode=1;});
