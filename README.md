@@ -2,13 +2,19 @@
 
 一个本地运行的 Windows 个人计划助手。桌面上的小芽团子是入口，点击打开计划，拖动可移动，右键可隐藏或退出。
 
+**下载使用：[最新 Windows 便携版](https://github.com/yihongPeng/PlanEveryday/releases/latest)** · [源码仓库](https://github.com/yihongPeng/PlanEveryday)
+
+完整解压后运行 `PlanEveryday.exe`。当前版本需要 Windows 10/11 x64 和可写的 **D 盘**，数据与缓存固定在 `D:\PlanEverydayData`；无需登录。代码采用 [MIT 许可证](LICENSE)，欢迎下载使用和改进。
+
+设置 → 启动方式 → **开机自启**：默认关闭；开启后登录 Windows 时只显示桌宠与托盘，不弹计划窗口。设置读取系统实际状态，不随数据备份导入。系统启动项和快捷方式属于 Windows 配置，任务、记背和备份仍在 D 盘。
+
 ## 开始体验
 
 - 双击桌面 **芽芽计划** 快捷方式。
-- 或运行 `D:\PlanEveryday\release\0.3.0\PlanEveryday-win32-x64\PlanEveryday.exe`。
+- 或运行 `D:\PlanEveryday\release\0.3.1\PlanEveryday-win32-x64\PlanEveryday.exe`。
 - 首次启动会显示计划小窗和桌宠；右上角 □ 可以最大化，再点击可还原。
 - 关闭窗口只会收起，桌宠和提醒继续运行。完全退出可用托盘右键或设置页的退出按钮。
-- 快捷方式指向发布目录，请保留整个 `release\0.3.0\PlanEveryday-win32-x64` 文件夹，不能只移动其中的 exe。
+- 快捷方式指向发布目录，请保留整个 `release\0.3.1\PlanEveryday-win32-x64` 文件夹，不能只移动其中的 exe。
 - 0.2.2 使用原生桌宠。收起约 10 秒后释放计划窗口的渲染进程，再打开恢复本次运行的草稿、筛选与阅读位置；提醒始终在后台调度。
 
 ## 怎么做计划
@@ -51,7 +57,7 @@ powershell -ExecutionPolicy Bypass -File scripts/install-shortcut.ps1
 测试发布版本：
 
 ```powershell
-$env:PLANEVERYDAY_EXE = 'D:\PlanEveryday\release\0.3.0\PlanEveryday-win32-x64\PlanEveryday.exe'
+$env:PLANEVERYDAY_EXE = 'D:\PlanEveryday\release\0.3.1\PlanEveryday-win32-x64\PlanEveryday.exe'
 $env:PLANEVERYDAY_TEST_NO_FOCUS = '1'
 node scripts/desktop-test.cjs
 node scripts/native-checks.cjs

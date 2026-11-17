@@ -1,7 +1,7 @@
 {
   "name": "planeveryday",
   "productName": "芽芽计划",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "A quiet personal planner with a desktop companion",
   "main": "src/main.cjs",
   "scripts": {
@@ -10,12 +10,16 @@
     "test:desktop": "node scripts/desktop-test.cjs",
     "package": "node scripts/package.cjs"
   },
-  "license": "UNLICENSED",
+  "license": "MIT",
   "private": true,
   "devDependencies": {
     "@electron/packager": "^20.3.0",
     "electron": "^45.3.2",
     "markdown-it": "15.0.3",
     "playwright": "^1.65.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yihongPeng/PlanEveryday.git"
   }
 }

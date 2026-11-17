@@ -3,6 +3,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { Store, validateBackup } = require('./store.cjs');
 const { NativePet } = require('./native-pet.cjs');
+const { Startup } = require('./startup.cjs');
 // This local text UI does not need a persistent hardware GPU context.
 // Native pet transparency is rendered independently by Windows.
 if(process.env.PLANEVERYDAY_HARDWARE_RENDER!=='1') app.disableHardwareAcceleration();
@@ -14,6 +15,7 @@ app.setAppUserModelId(appId);
 let mainWindow, petWindow, tray, store, quitting = false, timer, dragOrigin, notifications = new Set();
 let suspendTimer, boundsTimer, uiSession = null, pendingTaskId = null, wasMaximized = false;
 let petError = false;
+let startup,startupError='';
 const suspendMs = process.env.PLANEVERYDAY_DATA_DIR && process.env.PLANEVERYDAY_SUSPEND_MS ? Math.max(300, Number(process.env.PLANEVERYDAY_SUSPEND_MS)) : 10000;
 const testWithoutFocus = !!process.env.PLANEVERYDAY_DATA_DIR && process.env.PLANEVERYDAY_TEST_NO_FOCUS==='1';
 const ui = name => path.join(__dirname, 'ui', name);
@@ -21,7 +23,7 @@ const iconPath = path.join(__dirname, '..', 'assets', 'app.png');
 const single = app.requestSingleInstanceLock();
 if (!single) app.quit();
 else {
-  app.on('second-instance', () => showMain());
+  app.on('second-instance', (_event,argv) => {if(!argv?.includes('--autostart'))showMain();});
   app.whenReady().then(start).catch(error => { dialog.showErrorBox('芽芽计划无法启动', error.message); app.quit(); });
 }
 app.on('window-all-closed', () => {});
@@ -149,7 +151,9 @@ async function start() {
   }
   if(!process.env.PLANEVERYDAY_DATA_DIR){const {migrateData,migrationSources}=require('./data-location.cjs');migrateData(app.getPath('userData'),migrationSources(app.getPath('home')));}
   store = new Store(path.join(app.getPath('userData'), 'planner.sqlite'));
-  createMain(); createPet();
+  startup=new Startup({app,directory:app.getPath('userData'),supported:process.platform==='win32'&&app.isPackaged&&!process.env.PLANEVERYDAY_DATA_DIR});
+  try{startup.migrate();}catch{startupError='开机自启路径更新失败，请关闭后重新开启此选项。';}
+  if(!process.argv.includes('--autostart'))createMain(); createPet();
   tray = new Tray(nativeImage.createFromPath(iconPath).resize({ width: 24, height: 24 }));
   tray.setToolTip('芽芽计划 · 点击打开你的今天'); tray.on('click', () => showMain());
   updatePet();
@@ -161,7 +165,7 @@ async function start() {
 }
 
 const actions = {
-  snapshot: () => ({ ...store.snapshot(), maximized: mainWindow?.isMaximized()||false, notificationSupported: Notification.isSupported(), notificationFailed,notificationStatus,petError, dataPath: app.getPath('userData'), session:uiSession,requestedTaskId:pendingTaskId, pet:{native:petWindow instanceof NativePet,pid:petWindow?.pid,ready:petWindow?.ready,visible:petWindow?.visible,status:petWindow?.status,bounds:petWindow?.getBounds()} }),
+  snapshot: () => ({ ...store.snapshot(), startup:{...startup.status(),migrationError:startupError}, maximized: mainWindow?.isMaximized()||false, notificationSupported: Notification.isSupported(), notificationFailed,notificationStatus,petError, dataPath: app.getPath('userData'), session:uiSession,requestedTaskId:pendingTaskId, pet:{native:petWindow instanceof NativePet,pid:petWindow?.pid,ready:petWindow?.ready,visible:petWindow?.visible,status:petWindow?.status,bounds:petWindow?.getBounds()} }),
   'task:ack':id=>{if(pendingTaskId===id)pendingTaskId=null;},
   'notification:test':()=>{if(store.summary().settings.doNotDisturb)throw Error('当前开启免打扰，请关闭后再测试系统通知。');notificationStatus='已请求系统通知，等待结果';notify('芽芽计划 · 测试提醒','看到这条通知，说明系统提醒通道已工作。点击可以返回计划。');return true;},
   'session:restored': () => {uiSession=null;},
@@ -180,6 +184,7 @@ const actions = {
   schedule: data => store.scheduleTasks(data.ids, data.date),
   undoSchedule: data => store.undoSchedule(data),
   readEvents: () => store.markRead(),
+  'startup:set': ({enabled}) => {const result=startup.set(enabled);startupError='';return result;},
   settings: data => { store.setSettings(data); if(data.petVisible&&petWindow.isDestroyed())createPet();updatePet(); return true; },
   maximize: () => { if (mainWindow.isMaximized()) mainWindow.unmaximize(); else mainWindow.maximize(); return true; },
   minimize: () => mainWindow.minimize(),
