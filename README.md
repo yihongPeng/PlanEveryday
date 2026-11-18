@@ -4,7 +4,7 @@
 
 **下载使用：[最新 Windows 安装版](https://github.com/yihongPeng/PlanEveryday/releases/latest)** · [源码仓库](https://github.com/yihongPeng/PlanEveryday)
 
-下载并运行 `PlanEveryday-Setup-0.5.1.exe`，安装程序会创建桌面入口。当前版本需要 Windows 10/11 x64 和可写的 **D 盘**，数据与缓存固定在 `D:\PlanEverydayData`；无需登录。代码采用 [MIT 许可证](LICENSE)，欢迎下载使用和改进。
+下载并运行 `PlanEveryday-Setup-0.5.2.exe`，安装程序会创建桌面入口。当前版本需要 Windows 10/11 x64 和可写的 **D 盘**，数据与缓存固定在 `D:\PlanEverydayData`；无需登录。代码采用 [MIT 许可证](LICENSE)，欢迎下载使用和改进。
 
 设置 → 启动方式 → **开机自启**：默认关闭；开启后登录 Windows 时只显示桌宠与托盘，不弹计划窗口。设置读取系统实际状态，不随数据备份导入。系统启动项和快捷方式属于 Windows 配置，任务、记背和备份仍在 D 盘。
 
@@ -22,6 +22,8 @@
 0.4.1 及更早的便携版需要最后手动运行一次安装包；无需搬运数据库或图片，现有 D:/PlanEverydayData 会直接保留。安装前请保存旧版编辑并从设置或托盘正常退出。安装版在设置 → 软件更新中检查、下载、重启更新，不在普通退出时自动安装。下载失败可重试，下载与解压缓存在 D 盘。
 
 升级前自动备份任务、记背和引用图片。数据格式无法识别或迁移失败时停止启动，不用空库替代。应用内更新会保存当前编辑草稿并在重新打开后恢复。卸载默认不删除个人数据。历史便携目录不会擅自删除，更新后请使用新的桌面入口。
+
+0.5.2 修复更新后可能沿用旧快捷方式打开便携副本、使“检查更新”禁用的问题。更新结束直接打开固定安装目录，并修复已有入口。若 0.5.1 已出现此问题，从设置正常退出，再打开 `D:\Programs\PlanEveryday\PlanEveryday.exe`，即可继续检查并更新；无需移动数据。
 
 当前安装包没有商业代码签名证书；更新使用公开 GitHub Release 的 HTTPS 下载与 SHA-512 校验。Windows 系统管理的快捷方式、注册表和系统日志不属于应用数据目录。具体失败场景验收与边界见 [验收记录](docs/ACCEPTANCE.md)。
 
@@ -88,3 +90,9 @@ node scripts/media-test.cjs
 0.3.0：记背增加多个标签（最多 12 个，每个 24 字）、已有标签复用、未分类、标签筛选与搜索交集。输入用逗号分隔；点击标签即可复习同主题笔记。采用米白与苔绿的紧凑阅读排版，列表含摘要，支持 Markdown。旧内容保留，新备份格式 v3 仍支持导入 v1/v2。
 
 0.4.1：采用“安静的温暖”默认界面，移除持续标语、鼓励横幅和桌宠气泡，保留配色、阅读排版及必要提示。记背阅读页直接呈现标题与正文。
+
+## 构建与发布安装版
+
+先修改 package.json 和 package-lock.json 中的版本，再运行 `npm run installer`。构建输出在 `release/<版本>/installer`。GitHub 正式 Release 必须同时包含 `PlanEveryday-Setup-<版本>.exe`、对应 `.blockmap` 和 `latest.yml`；更新文件要等所有附件上传完成后一起公开。不要仅上传 ZIP 或只推代码。构建脚本为最终外层安装包生成 SHA-512、size 与 blockmap；不要手动替换成内层 NSIS 的元数据。
+
+校验与恢复测试：`node scripts/installer-test.cjs`（先按脚本头部说明构建隔离 QA 包）、`node scripts/update-test.cjs`、`node scripts/reminder-ack-test.cjs`。当前 `scripts/update-install-test.cjs` 记录 0.5.0 的完整 QA 更新流程，跨版本复用时应调整其显式测试包路径。所有测试目录位于 D 盘，个人数据库不进入仓库或安装包。

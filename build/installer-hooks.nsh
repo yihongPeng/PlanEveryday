@@ -230,6 +230,31 @@
     SetOutPath "$INSTDIR"
 !macroend
 
+!macro customInstall
+  ; Atomic replacement changes the executable's file identity. Rebuild only
+  ; existing owned links so Windows cannot track them to a retained old copy.
+  ; Missing links remain missing: deleting a shortcut is a user preference.
+  SetOutPath "$INSTDIR"
+  !ifndef DO_NOT_CREATE_START_MENU_SHORTCUT
+    ${If} $keepShortcuts == "true"
+    ${AndIf} ${FileExists} "$newStartMenuLink"
+      Delete "$newStartMenuLink"
+      CreateShortCut "$newStartMenuLink" "$INSTDIR\${APP_EXECUTABLE_FILENAME}" "" "$INSTDIR\${APP_EXECUTABLE_FILENAME}" 0 "" "" "${APP_DESCRIPTION}"
+      WinShell::SetLnkAUMI "$newStartMenuLink" "${APP_ID}"
+    ${EndIf}
+  !endif
+  !ifndef DO_NOT_CREATE_DESKTOP_SHORTCUT
+    ${IfNot} ${isNoDesktopShortcut}
+      ${If} $keepShortcuts == "true"
+      ${AndIf} ${FileExists} "$newDesktopLink"
+        Delete "$newDesktopLink"
+        CreateShortCut "$newDesktopLink" "$INSTDIR\${APP_EXECUTABLE_FILENAME}" "" "$INSTDIR\${APP_EXECUTABLE_FILENAME}" 0 "" "" "${APP_DESCRIPTION}"
+        WinShell::SetLnkAUMI "$newDesktopLink" "${APP_ID}"
+      ${EndIf}
+    ${EndIf}
+  !endif
+!macroend
+
 !macro customUnInit
   ${If} $INSTDIR != "${PLAN_INSTALL_DIR}"
     SetErrorLevel 28

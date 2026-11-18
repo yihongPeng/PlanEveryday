@@ -174,10 +174,11 @@ async function start() {
   }});
   media=new Media(app.getPath('userData'));
   protocol.handle('plan-image',request=>{try{return new Response(media.read(request.url),{headers:{'Content-Type':'image/png','Cache-Control':'no-store'}});}catch{return new Response('Image unavailable',{status:404});}});
-  startup=new Startup({app,directory:app.getPath('userData'),supported:process.platform==='win32'&&app.isPackaged&&!process.env.PLANEVERYDAY_DATA_DIR});
+  const desktopExe=require('./desktop-location.cjs').desktopExecutable();
+  startup=new Startup({app,directory:app.getPath('userData'),executable:desktopExe,supported:process.platform==='win32'&&app.isPackaged&&!process.env.PLANEVERYDAY_DATA_DIR});
   try{startup.migrate();}catch{startupError='开机自启路径更新失败，请关闭后重新开启此选项。';}
   if(app.isPackaged && !process.env.PLANEVERYDAY_DATA_DIR) {
-    const shortcut={target:process.execPath,cwd:path.dirname(process.execPath),icon:process.execPath,iconIndex:0,description:'芽芽计划 · 个人计划与记背',appUserModelId:appId};
+    const shortcut={target:desktopExe,cwd:path.dirname(desktopExe),icon:desktopExe,iconIndex:0,description:'芽芽计划 · 个人计划与记背',appUserModelId:appId};
     const menuDir=path.join(app.getPath('appData'),'Microsoft','Windows','Start Menu','Programs');
     fs.mkdirSync(menuDir,{recursive:true});
     shell.writeShortcutLink(path.join(menuDir,'芽芽计划.lnk'),'create',shortcut);

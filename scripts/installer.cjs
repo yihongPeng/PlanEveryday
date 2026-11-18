@@ -5,6 +5,8 @@ const {execFileSync} = require('node:child_process');
 const root = path.resolve(__dirname, '..');
 const projectMetadata = require('../package.json');
 const qa = process.argv.includes('--qa');
+const launchProbe = process.argv.includes('--qa-launch-probe');
+if(launchProbe&&!qa)throw new Error('The launch probe requires --qa.');
 const insufficientSpace = process.argv.includes('--qa-insufficient-space');
 if(insufficientSpace&&!qa)throw new Error('Insufficient-space simulation requires --qa.');
 const baseline = process.argv.find(argument=>argument.startsWith('--qa-baseline='))?.slice('--qa-baseline='.length);
@@ -12,12 +14,13 @@ if(baseline&&(!qa||!/^\d+\.\d+\.\d+$/.test(baseline)))throw new Error('A QA base
 const metadata = baseline ? {...projectMetadata,version:baseline} : projectMetadata;
 const skipPackage = process.argv.includes('--skip-package');
 if (process.platform !== 'win32') throw new Error('The Windows installer must be built on Windows.');
-const dataDir = qa ? path.join(root, 'test-results', 'installer-qa', 'data') : path.resolve('D:/PlanEverydayData');
-const installDir = qa ? path.join(root, 'test-results', 'installer-qa', 'app') : path.resolve('D:/Programs/PlanEveryday');
+const qaFolder = launchProbe ? 'installer-launch-qa' : 'installer-qa';
+const dataDir = qa ? path.join(root, 'test-results', qaFolder, 'data') : path.resolve('D:/PlanEverydayData');
+const installDir = qa ? path.join(root, 'test-results', qaFolder, 'app') : path.resolve('D:/Programs/PlanEveryday');
 const tempDir = path.join(dataDir, 'installer-temp');
-const outputDir = path.join(root, 'release', projectMetadata.version, qa ? (baseline?'installer-qa-baseline':insufficientSpace?'installer-qa-insufficient-space':'installer-qa') : 'installer');
+const outputDir = path.join(root, 'release', projectMetadata.version, qa ? (launchProbe?'installer-qa-launch-probe':baseline?'installer-qa-baseline':insufficientSpace?'installer-qa-insufficient-space':'installer-qa') : 'installer');
 const generated = path.join(outputDir, 'build');
-const packaged = baseline ? path.join(generated,'baseline-app') : path.join(root, 'release', metadata.version, 'PlanEveryday-win32-x64');
+const packaged = launchProbe ? path.join(generated,'launch-probe-app') : baseline ? path.join(generated,'baseline-app') : path.join(root, 'release', metadata.version, 'PlanEveryday-win32-x64');
 const compiler = path.join(process.env.WINDIR || 'C:\\Windows', 'Microsoft.NET', 'Framework64', 'v4.0.30319', 'csc.exe');
 for (const directory of [generated, tempDir, 'D:/PlanEverydayData/build-temp']) fs.mkdirSync(directory, {recursive:true});
 process.env.TEMP = process.env.TMP = 'D:/PlanEverydayData/build-temp';
@@ -57,7 +60,14 @@ internal static class BuildInfo {
 
 async function main() {
   if (require('electron-builder/package.json').version !== '26.18.1') throw new Error('Review the NSIS adaptation before upgrading electron-builder.');
-  if(baseline)fs.cpSync(path.join(root,'release',baseline,'PlanEveryday-win32-x64'),packaged,{recursive:true});
+  if(launchProbe){
+    fs.mkdirSync(path.join(packaged,'resources'),{recursive:true});
+    const probeSource=path.join(generated,'launch-probe.cs');
+    const launchLog=path.join(dataDir,'launches.tsv').replaceAll('"','""');
+    fs.writeFileSync(probeSource,`using System;using System.IO;using System.Reflection;class LaunchProbe{static void Main(string[] args){File.AppendAllText(@"${launchLog}",Assembly.GetExecutingAssembly().Location+"\\t"+String.Join(" ",args)+"\\t"+Environment.CurrentDirectory+"\\r\\n");}}`);
+    execFileSync(compiler,['/nologo','/target:winexe','/platform:x64',`/out:${path.join(packaged,'PlanEveryday.exe')}`,probeSource],{stdio:'inherit',windowsHide:true});
+  }
+  else if(baseline)fs.cpSync(path.join(root,'release',baseline,'PlanEveryday-win32-x64'),packaged,{recursive:true});
   else if (!skipPackage) execFileSync(process.execPath, [path.join(__dirname,'package.cjs')], {stdio:'inherit', windowsHide:true});
   if (!fs.existsSync(path.join(packaged,'PlanEveryday.exe'))) throw new Error('Run npm run package first.');
   // Prepackaged builds need this file explicitly, and its hash belongs in the
@@ -84,6 +94,11 @@ async function main() {
   fs.cpSync(nsisUtil.nsisTemplatesDir, templates, {recursive:true});
   nsisUtil.nsisTemplatesDir = templates;
   const edit = (file, transform) => {const name=path.join(templates,file);fs.writeFileSync(name,transform(fs.readFileSync(name,'utf8').replaceAll('\r\n','\n')));};
+  // Probe links live on D as well; the real Desktop and Start menu are untouched.
+  if(launchProbe)edit('common.nsh',source=>source.replaceAll('$DESKTOP','${PLAN_DATA_DIR}\\shortcut-test\\desktop').replaceAll('$SMPROGRAMS','${PLAN_DATA_DIR}\\shortcut-test\\start-menu'));
+  // A persisted .lnk may point to a portable or rollback copy. The freshly
+  // installed executable is the only valid post-install launch target.
+  edit('common.nsh',source=>replaceOnce(source,'${StdUtils.ExecShellAsUser} $0 "$launchLink" "open" "$startAppArgs"','${StdUtils.ExecShellAsUser} $0 "$INSTDIR\\${APP_EXECUTABLE_FILENAME}" "open" "$startAppArgs"','direct installed executable launch'));
   edit('installer.nsi', source => {
     source = replaceOnce(source, '  !ifmacrodef preInit\n    !insertmacro preInit\n  !endif', '', 'remove late preInit');
     return replaceOnce(source, 'Function .onInit\n', 'Function .onInit\n  !ifndef BUILD_UNINSTALLER\n    !insertmacro preInit\n  !endif\n', 'early preInit');
@@ -118,6 +133,7 @@ async function main() {
   if(baseline)config.extraMetadata={version:baseline};
   config.nsis={...config.nsis,include:hooks};
   if(qa){config.appId='local.PlanEveryday.InstallerQA';config.nsis={...config.nsis,createDesktopShortcut:false,createStartMenuShortcut:false,runAfterFinish:false};}
+  if(launchProbe){config.appId='local.PlanEveryday.InstallerLaunchQA';config.nsis={...config.nsis,createDesktopShortcut:true,createStartMenuShortcut:true,runAfterFinish:true,shortcutName:'PlanEveryday launch QA',uninstallDisplayName:'PlanEveryday launch QA'};}
   await build({projectDir:root,prepackaged:packaged,targets:Platform.WINDOWS.createTarget(['nsis'],Arch.x64),config,publish:'never'});
   const setup = path.join(outputDir,`PlanEveryday-Setup-${metadata.version}.exe`);
   const inner = path.join(generated,'nsis-installer.exe');
