@@ -13,8 +13,8 @@ class UpdateService {
  }
  snapshot(){return {...this.state};}
  set(patch){Object.assign(this.state,patch);this.onChange();}
- async check(){if(['checking','downloading','installing','ready'].includes(this.state.phase))return;this.set({phase:'checking',message:'正在检查更新'});try{await this.engine.checkForUpdates();}catch(e){this.set({phase:'error',message:'检查失败，请检查网络后重试。当前版本不受影响。'});throw e;}}
- async download(){if(this.state.phase!=='available')throw Error('请先检查新版本');this.set({phase:'downloading',percent:0,message:'正在下载'});try{await this.preflight();await this.engine.downloadUpdate();}catch(e){this.set({phase:'error',message:'下载或校验失败，请重新检查更新。当前版本不受影响。'});throw e;}}
+ async check(){if(['checking','downloading','installing','ready'].includes(this.state.phase))return;this.set({phase:'checking',message:'正在检查更新'});try{await this.engine.checkForUpdates();}catch(e){this.set({phase:'error',message:e.code==='ERR_UPDATER_CHANNEL_FILE_NOT_FOUND'?'更新信息暂未就绪，请稍后重试。当前版本可正常使用。':'检查失败，请检查网络后重试。当前版本不受影响。'});throw new Error(this.state.message);}}
+ async download(){if(this.state.phase!=='available')throw Error('请先检查新版本');this.set({phase:'downloading',percent:0,message:'正在下载'});let preflightPassed=false;try{await this.preflight();preflightPassed=true;await this.engine.downloadUpdate();}catch(e){this.set({phase:'error',message:preflightPassed?'下载或校验失败，请重新检查更新。当前版本不受影响。':'D 盘空间不足或目录不可写，请检查后重试。'});throw new Error(this.state.message);}}
  async install(){if(this.state.phase!=='ready')throw Error('请先下载完整更新');this.set({phase:'installing',message:'正在备份数据与草稿'});let verified=false;try{await this.verify();verified=true;await this.prepare();this.engine.quitAndInstall(false,true);}catch(e){if(!verified){await this.engine.downloadedUpdateHelper?.clear().catch(()=>{});this.engine.downloadedUpdateHelper=null;}this.set({phase:verified?'ready':'error',message:'未安装：'+e.message});throw e;}}
 }
 async function verifyInstaller(engine,cacheRoot){

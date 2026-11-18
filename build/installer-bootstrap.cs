@@ -18,6 +18,9 @@ internal static class InstallerBootstrap {
             EnsureNoReparsePath(BuildInfo.InstallRoot, true);
             EnsureNoReparsePath(BuildInfo.UpdateRoot, true);
             Directory.CreateDirectory(BuildInfo.TempRoot);
+            // The updater inherits the installed app's working directory.
+            // Release it before NSIS renames that directory during an upgrade.
+            Environment.CurrentDirectory = BuildInfo.TempRoot;
             string executable = Assembly.GetExecutingAssembly().Location;
             string installDirectory = BuildInfo.InstallRoot;
             string[] forwarded = args;

@@ -4,7 +4,7 @@
 
 **下载使用：[最新 Windows 安装版](https://github.com/yihongPeng/PlanEveryday/releases/latest)** · [源码仓库](https://github.com/yihongPeng/PlanEveryday)
 
-下载并运行 `PlanEveryday-Setup-0.5.0.exe`，安装程序会创建桌面入口。当前版本需要 Windows 10/11 x64 和可写的 **D 盘**，数据与缓存固定在 `D:\PlanEverydayData`；无需登录。代码采用 [MIT 许可证](LICENSE)，欢迎下载使用和改进。
+下载并运行 `PlanEveryday-Setup-0.5.1.exe`，安装程序会创建桌面入口。当前版本需要 Windows 10/11 x64 和可写的 **D 盘**，数据与缓存固定在 `D:\PlanEverydayData`；无需登录。代码采用 [MIT 许可证](LICENSE)，欢迎下载使用和改进。
 
 设置 → 启动方式 → **开机自启**：默认关闭；开启后登录 Windows 时只显示桌宠与托盘，不弹计划窗口。设置读取系统实际状态，不随数据备份导入。系统启动项和快捷方式属于 Windows 配置，任务、记背和备份仍在 D 盘。
 

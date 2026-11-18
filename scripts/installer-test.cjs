@@ -21,7 +21,7 @@ const report=preflightOnly&&fs.existsSync(path.join(qa,'installer-test-results.j
 const sha=file=>crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const asarFile=()=>path.join(app,'resources','app.asar');
 function record(scenario,extra={}){const result={scenario,passed:true,...extra};report.push(result);console.log(JSON.stringify(result));fs.writeFileSync(path.join(qa,'installer-test-results.json'),JSON.stringify(report,null,2));}
-function run(file,args=[],env={}){return new Promise((resolve,reject)=>{const child=spawn(file,args,{windowsHide:true,env:{...process.env,...env},stdio:'pipe'});let output='';child.stdout.on('data',chunk=>output+=chunk);child.stderr.on('data',chunk=>output+=chunk);const timer=setTimeout(()=>reject(Error(`Installer timed out: ${file}. Child pid ${child.pid}; inspect before stopping it.`)),90000);child.on('error',reject);child.on('exit',code=>{clearTimeout(timer);resolve({code,output});});});}
+function run(file,args=[],env={}){return new Promise((resolve,reject)=>{const child=spawn(file,args,{windowsHide:true,cwd:args.includes('--updated')?app:root,env:{...process.env,...env},stdio:'pipe'});let output='';child.stdout.on('data',chunk=>output+=chunk);child.stderr.on('data',chunk=>output+=chunk);const timer=setTimeout(()=>reject(Error(`Installer timed out: ${file}. Child pid ${child.pid}; inspect before stopping it.`)),90000);child.on('error',reject);child.on('exit',code=>{clearTimeout(timer);resolve({code,output});});});}
 async function uninstall(){
  const source=path.join(app,'Uninstall PlanEveryday.exe');
  if(!fs.existsSync(source))return;
