@@ -1,6 +1,6 @@
 ﻿$projectRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$exePath = Join-Path $projectRoot 'release\0.4.1\PlanEveryday-win32-x64\PlanEveryday.exe'
-if (-not (Test-Path -LiteralPath $exePath)) { throw '请先执行 npm run package。' }
+$exePath = 'D:\Programs\PlanEveryday\PlanEveryday.exe'
+if (-not (Test-Path -LiteralPath $exePath)) { throw '请先运行芽芽计划安装包。' }
 $desktopPath = [Environment]::GetFolderPath('Desktop')
 $shortcutPath = Join-Path $desktopPath '芽芽计划.lnk'
 $wsh = New-Object -ComObject WScript.Shell

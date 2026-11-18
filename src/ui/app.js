@@ -31,6 +31,7 @@ function setView(next) {
  if (next === 'future' && day < localDate()) day = localDate();
  $('#quick-date').value = next === 'inbox' ? '' : next === 'future' ? day : localDate();
  selectedId = null; $('#detail').hidden = true; render(); $('#content').scrollTop = 0;
+ if(next==='events'&&state.events.some(e=>!e.readAt))run(async()=>{await api('readEvents');await refresh();});
 }
 function render() {
  document.body.dataset.page=view;
@@ -110,7 +111,13 @@ function renderSettings() {
  const setting = (key, title, note) => `<div class="settings-row"><div><h3>${title}</h3><p>${note}</p></div><input class="toggle" type="checkbox" data-setting="${key}" aria-label="${title}" ${s[key] ? 'checked' : ''}></div>`;
  $('#content').innerHTML = `${state.petError?'<p class="error-message">桌宠进程已停止。请关闭再打开“显示桌宠”开关恢复；计划与提醒仍正常运行。</p>':''}<h2 class="settings-section">桌宠与提醒</h2><div class="settings-card">${setting('petVisible','显示桌宠','点击芽芽打开计划，拖动可以挪位置。')}${setting('petAlwaysOnTop','桌宠保持在最上层','不主动抢焦点，随时都找得到。')}${setting('doNotDisturb','免打扰','不弹出系统通知，提醒仍会保存在记录中。')}</div>
  <h2 class="settings-section">启动方式</h2><div class="settings-card"><div class="settings-row"><div><h3>开机自启</h3><p>登录 Windows 后启动芽芽，只显示桌宠和托盘。<br>计划窗口不会自动弹出；桌宠显隐沿用你的设置。</p><p class="error-message">${escapeHtml(state.startup?.migrationError||state.startup?.note||'')}</p></div><input class="toggle" id="startup-toggle" type="checkbox" aria-label="开机自启" ${state.startup?.enabled?'checked':''} ${state.startup?.supported?'':'disabled'}></div></div><h2 class="settings-section">数据与备份</h2><div class="settings-card"><div class="settings-row"><div><h3>离线使用，只保存在这台电脑</h3><p>不需要账号，也不会上传你的计划。</p></div></div><div class="settings-actions"><button class="secondary-button" data-action="export">导出备份</button><button class="secondary-button" data-action="import">恢复备份</button><button class="text-button" data-action="openDataFolder">打开数据目录</button></div></div>
- <h2 class="settings-section">提醒与入口</h2><div class="settings-card"><div class="settings-row"><div><h3>系统通知${state.notificationSupported && !state.notificationFailed ? '功能已支持' : '暂不可用'}</h3><p>${state.notificationFailed ? '系统通知发送失败，请检查 Windows 通知设置。' : '实际弹出受 Windows 通知权限与专注设置影响。'}<br>${escapeHtml(state.notificationStatus)}<br>即使没有弹窗，仍可在提醒记录中查看。</p></div><div><button class="text-button" data-action="notification:test">发送测试提醒</button><button class="text-button" data-view="events">查看记录</button></div></div><div class="settings-row"><div><h3>关闭窗口 ≠ 退出应用</h3><p>窗口关闭后，点击桌宠或系统托盘即可回来。<br>完全退出后不再提醒，再启动会检查错过的计划。</p></div></div></div><button class="danger-button" data-action="quit">退出芽芽计划</button><p class="muted">芽芽计划 0.4.1</p>`;
+ ${renderUpdateSettings()}<h2 class="settings-section">提醒与入口</h2><div class="settings-card"><div class="settings-row"><div><h3>系统通知${state.notificationSupported && !state.notificationFailed ? '功能已支持' : '暂不可用'}</h3><p>${state.notificationFailed ? '系统通知发送失败，请检查 Windows 通知设置。' : '实际弹出受 Windows 通知权限与专注设置影响。'}<br>${escapeHtml(state.notificationStatus)}<br>即使没有弹窗，仍可在提醒记录中查看。</p></div><div><button class="text-button" data-action="notification:test">发送测试提醒</button><button class="text-button" data-view="events">查看记录</button></div></div><div class="settings-row"><div><h3>关闭窗口 ≠ 退出应用</h3><p>窗口关闭后，点击桌宠或系统托盘即可回来。<br>完全退出后不再提醒，再启动会检查错过的计划。</p></div></div></div><button class="danger-button" data-action="quit">退出芽芽计划</button><p class="muted">芽芽计划 ${escapeHtml(state.version||'0.5.0')}</p>`;
+}
+function renderUpdateSettings(){
+ const u=state.update||{},busy=['checking','downloading','installing'].includes(u.phase);
+ const action=u.phase==='available'?'update:download':u.phase==='ready'?'update:install':'update:check';
+ const label=u.phase==='available'?'下载更新':u.phase==='ready'?'重启并更新':u.phase==='error'?'重试检查':'检查更新';
+ return `<h2 class="settings-section">软件更新</h2><div class="settings-card"><div class="settings-row"><div><h3>当前版本 ${escapeHtml(state.version)}</h3><p role="status">${escapeHtml(u.message||'手动检查或启动时安静检查更新')}${u.version?' · '+escapeHtml(u.version):''}${u.phase==='downloading'?' · '+u.percent+'%':''}</p><p>安装、更新缓存与个人数据均保存在 D 盘。<br>更新前自动备份，重启后恢复编辑草稿。</p></div></div><div class="settings-actions"><button class="secondary-button" data-action="${action}" ${!u.supported||busy?'disabled':''}>${busy?'处理中…':label}</button></div></div>`;
 }
 function renderEvents() {
  const events = [...state.events].sort((a,b) => b.createdAt.localeCompare(a.createdAt));
@@ -165,6 +172,7 @@ document.addEventListener('click', e => run(async () => {
  if (d.replace) { await api('focus', { id: focusId, replaceId: d.replace }); $('#focus-dialog').close(); await refresh(); }
  if (d.empty === 'add') $('#quick-title').focus();
  if (d.empty === 'clear') { search = ''; filter = 'all'; $('#search').value = ''; $('#priority-filter').value = 'all'; render(); }
+ if(d.action?.startsWith('update:')){await api(d.action);return;}
  if (d.action) { const result = await api(d.action); if (d.action === 'export' && result) toast('备份已导出'); if (d.action === 'import' && result) { drafts.clear(); selectedId=null; $('#detail').hidden=true; window.MemoryView.resetAfterRestore(); toast('备份已恢复'); } await refresh(); }
 }));
 document.addEventListener('change', e => run(async () => {
@@ -199,6 +207,7 @@ document.addEventListener('keydown', e => {
  if (e.ctrlKey && e.key.toLowerCase() === 'f') { e.preventDefault(); if(view==='memory'){window.MemoryView.focusSearch();return;} if (['settings','events'].includes(view)) setView('today'); $('#search').focus(); }
  if (e.key === 'Escape' && selectedId && !document.querySelector('dialog[open]')) $('#detail-cancel').click();
 });
+window.planner.onUpdate(update=>{state.update=update;if(view==='settings')renderSettings();});
 window.planner.onChange(() => { if(!completing) run(refresh); }); window.planner.onOpenTask(id => run(async () => { await refresh(); openDetail(id); }));
 setInterval(() => { if (lastDay !== localDate()) { const previous = lastDay; lastDay = localDate(); if ($('#quick-date').value === previous) $('#quick-date').value = lastDay; if (day < lastDay) day = lastDay; run(refresh); } }, 15000);
 $('#quick-date').value = localDate(); run(refresh);

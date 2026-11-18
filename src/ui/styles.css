@@ -4,3 +4,31 @@
 
 /* Quiet warmth: hierarchy through spacing, not persistent slogans. */
 .sidebar-bottom{margin-top:auto}.sidebar{padding-top:24px}.page-top{margin-bottom:16px}.today-summary{padding:0 0 14px;color:var(--muted);font-size:13px}.today-summary p{margin:0}.empty-state{padding:36px 16px}.workspace{padding-bottom:20px}
+
+/* Tasks first: the page chrome recedes; readable task rows carry the contrast. */
+body:is([data-page="today"],[data-page="inbox"],[data-page="future"],[data-page="done"]) .workspace{padding-top:20px}
+body:is([data-page="today"],[data-page="inbox"],[data-page="future"],[data-page="done"]) .page-top{margin-bottom:8px;gap:12px}
+body:is([data-page="today"],[data-page="inbox"],[data-page="future"],[data-page="done"]) .page-top>div{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+body:is([data-page="today"],[data-page="inbox"],[data-page="future"],[data-page="done"]) h1{font-size:20px;font-weight:500;letter-spacing:0;color:#59695d}
+body:is([data-page="today"],[data-page="inbox"],[data-page="future"],[data-page="done"]) .heading-dot{display:none}
+body[data-page="today"] #subtitle{font-size:12px;margin:0}
+.today-summary{font-size:12px;padding-bottom:10px}
+.quick-form{height:40px;border-color:var(--line);background:transparent;box-shadow:none;padding:3px 4px 3px 10px}
+.quick-form input{font-size:13px}.quick-form .add-symbol{font-size:19px}
+.quick-form .primary-button{background:#e8ede3;color:#45634b;padding:6px 11px;min-height:32px}
+.quick-form:focus-within{background:white}.quick-form:focus-within .primary-button{background:var(--green);color:white}
+.entry-meta{min-height:32px;margin-bottom:0}.list-toolbar{margin:0 0 4px}
+.task-row{background:#fffefa;border-color:#dce1d6;border-radius:10px;min-height:78px;padding:15px 14px;margin-bottom:10px;gap:12px}
+.task-title{font-size:18px;font-weight:600;line-height:1.55;color:#263a2e;letter-spacing:.1px}
+.task-meta:empty{display:none}.task-meta{margin-top:5px;color:#667260}
+.task-row.is-focus{background:#eaf0e4;border-color:#ccd9c3;border-left:3px solid #668253;padding-left:12px}
+.task-row.is-done{background:transparent;opacity:.75}.task-row.is-done .task-title{font-size:15px;font-weight:400}
+.check-button{width:32px;height:32px;min-height:32px;line-height:29px;border-color:#aab6a1;font-size:16px}
+.task-date{color:#687661}.group-heading{letter-spacing:0;margin:12px 0 9px;font-weight:500}
+@media(max-width:759px){
+ body:is([data-page="today"],[data-page="inbox"],[data-page="future"],[data-page="done"]) .workspace{padding-top:12px}
+ body[data-page="today"] .page-top>div{gap:5px 10px}
+ body[data-page="today"] #subtitle{font-size:12px}
+ .task-title{font-size:17px}.task-row{padding:13px 10px;gap:9px;min-height:74px}.task-row.is-focus{padding-left:8px}
+ .task-date{padding:4px}.task-actions{gap:0}.star-button{min-width:28px}
+}

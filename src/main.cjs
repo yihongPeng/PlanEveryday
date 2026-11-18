@@ -15,12 +15,17 @@ if(process.env.PLANEVERYDAY_HARDWARE_RENDER!=='1') app.disableHardwareAccelerati
 
 if (process.env.PLANEVERYDAY_DATA_DIR) app.setPath('userData', process.env.PLANEVERYDAY_DATA_DIR);
 else {const directory='D:\\PlanEverydayData';try{fs.mkdirSync(directory,{recursive:true});app.setPath('userData',directory);}catch(error){dialog.showErrorBox('无法打开 D 盘数据目录','请确认 D 盘可用且可写：'+directory+'。为保护数据，程序不会切换到 C 盘创建空库。');app.exit(1);}}
+// Set every application-controlled temporary/cache location before Chromium starts.
+const runtimeTemp=path.join(app.getPath('userData'),'temp');
+fs.mkdirSync(runtimeTemp,{recursive:true});process.env.TEMP=runtimeTemp;process.env.TMP=runtimeTemp;app.setPath('temp',runtimeTemp);
+for(const name of ['sessionData','crashDumps']){const location=path.join(app.getPath('userData'),name);fs.mkdirSync(location,{recursive:true});app.setPath(name,location);}
+app.setAppLogsPath(path.join(app.getPath('userData'),'logs'));
 const appId = process.env.PLANEVERYDAY_DATA_DIR ? 'local.PlanEveryday.QA' : 'local.PlanEveryday.Desktop';
 app.setAppUserModelId(appId);
 let mainWindow, petWindow, tray, store, quitting = false, timer, dragOrigin, notifications = new Set();
 let suspendTimer, boundsTimer, uiSession = null, pendingTaskId = null, wasMaximized = false;
 let petError = false;
-let startup,startupError='';
+let startup,startupError='',updates;
 const suspendMs = process.env.PLANEVERYDAY_DATA_DIR && process.env.PLANEVERYDAY_SUSPEND_MS ? Math.max(300, Number(process.env.PLANEVERYDAY_SUSPEND_MS)) : 10000;
 const testWithoutFocus = !!process.env.PLANEVERYDAY_DATA_DIR && process.env.PLANEVERYDAY_TEST_NO_FOCUS==='1';
 const ui = name => path.join(__dirname, 'ui', name);
@@ -54,6 +59,11 @@ function showMain(id) {
   foreground();
   mainWindow.webContents.send('state-changed');
 }
+function acknowledgeReminders(){
+ if(!store?.summary().unread)return;
+ try{store.markRead();broadcast();}catch(error){dialog.showErrorBox('无法保存提醒状态',error.message);}
+}
+function openFromPet(){acknowledgeReminders();showMain();}
 function broadcast() {
   for (const w of [mainWindow, petWindow]) if (w && !w.isDestroyed() && w.webContents && (w !== mainWindow || w.isVisible())) w.webContents.send('state-changed');
   if (petWindow?.setState) petWindow.setState(store.summary());
@@ -81,7 +91,7 @@ function notify(title, body, taskId) {
   const n = new Notification({ title, body, icon: iconPath, silent: true });
   notifications.add(n);
   n.on('show',()=>{notificationStatus='系统已接收通知（实际展示受专注模式影响）';notificationFailed=false;broadcast();});
-  n.on('click', () => {notifications.delete(n);showMain(taskId);});
+  n.on('click', () => {notifications.delete(n);acknowledgeReminders();showMain(taskId);});
   n.on('close', () => notifications.delete(n));
   n.on('failed', () => { notifications.delete(n); notificationFailed = true;notificationStatus='发送失败，请检查 Windows 通知设置'; broadcast(); });
   n.show();
@@ -140,7 +150,7 @@ function createPet() {
   const bounds=visibleBounds(settings.petPosition,{x:area.x+area.width-146,y:area.y+area.height-150,width:116,height:132});
   if(process.platform==='win32' && process.env.PLANEVERYDAY_WEB_PET!=='1') {
     petError=false;
-    petWindow=new NativePet({app,screen,bounds,onOpen:()=>showMain(),onMove:position=>store.setSettings({petPosition:position}),onHide:()=>{store.setSettings({petVisible:false});updatePet();broadcast();},onQuit:()=>app.quit(),onError:()=>{petError=true;broadcast();}});
+    petWindow=new NativePet({app,screen,bounds,onOpen:()=>openFromPet(),onMove:position=>store.setSettings({petPosition:position}),onHide:()=>{store.setSettings({petVisible:false});updatePet();broadcast();},onQuit:()=>app.quit(),onError:()=>{petError=true;broadcast();}});
     return;
   }
   petWindow = new BrowserWindow({ ...visibleBounds(settings.petPosition, { x: area.x + area.width - 146, y: area.y + area.height - 150, width: 116, height: 132 }), width: 116, height: 132, transparent: true, frame: false, resizable: false, skipTaskbar: true, hasShadow: false, focusable: false, show: false, webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true } });
@@ -149,6 +159,23 @@ function createPet() {
 }
 async function start() {
   fs.mkdirSync(app.getPath('userData'), { recursive: true });
+  if(!process.env.PLANEVERYDAY_DATA_DIR){const {migrateData,migrationSources}=require('./data-location.cjs');migrateData(app.getPath('userData'),migrationSources(app.getPath('home')));}
+  const {prepareDataUpgrade,markDataReady}=require('./upgrade-data.cjs');
+  prepareDataUpgrade(app.getPath('userData'),app.getVersion());
+  store = new Store(path.join(app.getPath('userData'), 'planner.sqlite'));
+  markDataReady(app.getPath('userData'),app.getVersion());
+  const sessionFile=path.join(app.getPath('userData'),'update-session.json');
+  if(fs.existsSync(sessionFile)){try{const saved=JSON.parse(fs.readFileSync(sessionFile,'utf8'));if(saved&&Array.isArray(saved.drafts)&&Array.isArray(saved.selection)&&saved.storage)uiSession=saved;}catch{}}
+  updates=require('./desktop-updates.cjs').createDesktopUpdates({app,onChange:()=>{if(mainWindow&&!mainWindow.isDestroyed())mainWindow.webContents.send('update-changed',updates?.snapshot());},prepare:async()=>{
+    require('./updates.cjs').diskPreflight(app.getPath('userData'));
+    saveBackup(path.join(app.getPath('userData'),'backups',`before-update-${Date.now()}.json`),media.export(store.exportBackup()));
+    const session=mainWindow&&!mainWindow.isDestroyed()?await mainWindow.webContents.executeJavaScript('window.captureSessionState()'):uiSession;
+    if(session){const temp=sessionFile+'.tmp';fs.writeFileSync(temp,JSON.stringify(session));fs.renameSync(temp,sessionFile);}
+  }});
+  media=new Media(app.getPath('userData'));
+  protocol.handle('plan-image',request=>{try{return new Response(media.read(request.url),{headers:{'Content-Type':'image/png','Cache-Control':'no-store'}});}catch{return new Response('Image unavailable',{status:404});}});
+  startup=new Startup({app,directory:app.getPath('userData'),supported:process.platform==='win32'&&app.isPackaged&&!process.env.PLANEVERYDAY_DATA_DIR});
+  try{startup.migrate();}catch{startupError='开机自启路径更新失败，请关闭后重新开启此选项。';}
   if(app.isPackaged && !process.env.PLANEVERYDAY_DATA_DIR) {
     const shortcut={target:process.execPath,cwd:path.dirname(process.execPath),icon:process.execPath,iconIndex:0,description:'芽芽计划 · 个人计划与记背',appUserModelId:appId};
     const menuDir=path.join(app.getPath('appData'),'Microsoft','Windows','Start Menu','Programs');
@@ -156,12 +183,6 @@ async function start() {
     shell.writeShortcutLink(path.join(menuDir,'芽芽计划.lnk'),'create',shortcut);
     shell.writeShortcutLink(path.join(app.getPath('desktop'),'芽芽计划.lnk'),'create',shortcut);
   }
-  if(!process.env.PLANEVERYDAY_DATA_DIR){const {migrateData,migrationSources}=require('./data-location.cjs');migrateData(app.getPath('userData'),migrationSources(app.getPath('home')));}
-  store = new Store(path.join(app.getPath('userData'), 'planner.sqlite'));
-  media=new Media(app.getPath('userData'));
-  protocol.handle('plan-image',request=>{try{return new Response(media.read(request.url),{headers:{'Content-Type':'image/png','Cache-Control':'no-store'}});}catch{return new Response('Image unavailable',{status:404});}});
-  startup=new Startup({app,directory:app.getPath('userData'),supported:process.platform==='win32'&&app.isPackaged&&!process.env.PLANEVERYDAY_DATA_DIR});
-  try{startup.migrate();}catch{startupError='开机自启路径更新失败，请关闭后重新开启此选项。';}
   if(!process.argv.includes('--autostart'))createMain(); createPet();
   tray = new Tray(nativeImage.createFromPath(iconPath).resize({ width: 24, height: 24 }));
   tray.setToolTip('芽芽计划 · 点击打开你的今天'); tray.on('click', () => showMain());
@@ -174,10 +195,13 @@ async function start() {
 }
 
 const actions = {
-  snapshot: () => ({ ...store.snapshot(), startup:{...startup.status(),migrationError:startupError}, maximized: mainWindow?.isMaximized()||false, notificationSupported: Notification.isSupported(), notificationFailed,notificationStatus,petError, dataPath: app.getPath('userData'), session:uiSession,requestedTaskId:pendingTaskId, pet:{native:petWindow instanceof NativePet,pid:petWindow?.pid,ready:petWindow?.ready,visible:petWindow?.visible,status:petWindow?.status,bounds:petWindow?.getBounds()} }),
+  'update:check':()=>updates.check(),
+  'update:download':()=>updates.download(),
+  'update:install':()=>updates.install(),
+  snapshot: () => ({ ...store.snapshot(), version:app.getVersion(),update:updates?.snapshot(), startup:{...startup.status(),migrationError:startupError}, maximized: mainWindow?.isMaximized()||false, notificationSupported: Notification.isSupported(), notificationFailed,notificationStatus,petError, dataPath: app.getPath('userData'), session:uiSession,requestedTaskId:pendingTaskId, pet:{native:petWindow instanceof NativePet,pid:petWindow?.pid,ready:petWindow?.ready,visible:petWindow?.visible,status:petWindow?.status,bounds:petWindow?.getBounds()} }),
   'task:ack':id=>{if(pendingTaskId===id)pendingTaskId=null;},
   'notification:test':()=>{if(store.summary().settings.doNotDisturb)throw Error('当前开启免打扰，请关闭后再测试系统通知。');notificationStatus='已请求系统通知，等待结果';notify('芽芽计划 · 测试提醒','看到这条通知，说明系统提醒通道已工作。点击可以返回计划。');return true;},
-  'session:restored': () => {uiSession=null;},
+  'session:restored': () => {uiSession=null;const file=path.join(app.getPath('userData'),'update-session.json');if(fs.existsSync(file))fs.unlinkSync(file);},
   'knowledge:add': data => {media.checkBudget([...store.snapshot().knowledge,{content:typeof data?.content==='string'?data.content:''}]);return store.addKnowledge(data);},
   'image:add': ({bytes}) => {if(!(bytes instanceof Uint8Array)||bytes.byteLength>MAX_IMAGE)throw Error('图片无效，单张最多 10 MB');return importImage(Buffer.from(bytes));},
   'image:choose': async () => {const result=await dialog.showOpenDialog(mainWindow,{title:'插入图片',defaultPath:app.getPath('userData'),filters:[{name:'图片',extensions:['png','jpg','jpeg','webp','gif','bmp']}],properties:['openFile','multiSelections']});if(result.canceled)return [];if(result.filePaths.length>12)throw Error('一次最多插入 12 张图片');const bytes=result.filePaths.map(file=>{if(fs.statSync(file).size>MAX_IMAGE)throw Error('单张图片不能超过 10 MB');return fs.readFileSync(file);});const images=bytes.map(b=>decodeImage(b).toPNG());return images.map(b=>media.add(b));},
@@ -226,13 +250,14 @@ const actions = {
 ipcMain.handle('planner', async (event, action, data) => {
   if (![mainWindow?.webContents, petWindow?.webContents].includes(event.sender)) return { ok: false, error: '未知窗口' };
   if (event.sender === petWindow?.webContents && action !== 'snapshot') return { ok: false, error: '无权执行' };
+  if(updates?.snapshot().phase==='installing'&&!['snapshot','session:restored'].includes(action))return {ok:false,error:'正在准备更新，请稍候。'};
   if (!Object.hasOwn(actions, action)) return { ok: false, error: '不支持的操作' };
-  try { const result = await actions[action](data); if (action !== 'snapshot') broadcast(); return { ok: true, data: result }; }
+  try { const result = await actions[action](data); if (action !== 'snapshot'&&!action.startsWith('update:')) broadcast(); return { ok: true, data: result }; }
   catch (error) { return { ok: false, error: error.message || '操作失败，请重试。' }; }
 });
 ipcMain.on('pet-action', (event, action, data) => {
   if (event.sender !== petWindow?.webContents) return;
-  if (action === 'open') showMain();
+  if (action === 'open') openFromPet();
   if (action === 'menu') tray.popUpContextMenu();
   if (action === 'dragStart') dragOrigin = { cursor: screen.getCursorScreenPoint(), bounds: petWindow.getBounds() };
   if (action === 'drag' && dragOrigin) {

@@ -1,0 +1,31 @@
+// Isolated D-drive upgrade and real electron-updater transport checks; no production settings.
+const {_electron:electron}=require('playwright'),fs=require('node:fs'),path=require('node:path'),http=require('node:http'),assert=require('node:assert/strict'),{createHash}=require('node:crypto');
+const root=path.resolve(__dirname,'..'),dir=fs.mkdtempSync(path.join(root,'test-results','upgrade-'));
+const old=path.join(root,'release/0.4.1/PlanEveryday-win32-x64/PlanEveryday.exe');
+const next=process.env.PLANEVERYDAY_EXE||require('electron');let app,server;
+const launch=exe=>electron.launch({executablePath:exe,args:exe===require('electron')?[root]:[],env:{...process.env,PLANEVERYDAY_DATA_DIR:dir,PLANEVERYDAY_TEST_NO_FOCUS:'1'},timeout:40000});
+(async()=>{try{
+ app=await launch(old);let page=await app.firstWindow();await page.locator('#quick-title').waitFor();
+ const image=await page.evaluate(async bytes=>(await window.planner.invoke('image:add',{bytes:new Uint8Array(bytes)})).data,[...fs.readFileSync(path.join(root,'assets/app.png'))]);
+ await page.evaluate(async uri=>window.planner.invoke('knowledge:add',{title:'旧版图片',content:'![图]('+uri+')'}),image);
+ const before=await page.evaluate(async()=>{const call=async(a,d)=>{const r=await window.planner.invoke(a,d);if(!r.ok)throw Error(r.error);return r.data;};await call('add',{title:'升级保留任务',plannedDate:null});await call('knowledge:add',{title:'升级保留记背',content:'```js\nconst value = 1;\n```',tags:['升级'],pinned:true});return call('snapshot');});
+ await app.close();app=await launch(next);page=await app.firstWindow();await page.locator('#quick-title').waitFor();
+ const after=(await page.evaluate(()=>window.planner.invoke('snapshot'))).data;assert.deepEqual(after.tasks,before.tasks);assert.deepEqual(after.knowledge,before.knowledge);assert.ok(fs.readdirSync(path.join(dir,'backups')).some(f=>f.startsWith('before-upgrade-')));console.log('PASS real 0.4.1 to new app preserves tasks/notes/tags and creates backup');
+ let mode='404';const fixture=process.env.PLANEVERYDAY_INSTALLER?fs.readFileSync(process.env.PLANEVERYDAY_INSTALLER):Buffer.from('MZ test fixture never executed');const checksum=createHash('sha512').update(fixture).digest('base64');
+ server=http.createServer((req,res)=>{if(mode==='404'){res.writeHead(404);return res.end();}if(req.url.startsWith('/latest.yml'))return res.end(`version: 9.0.0\nfiles:\n  - url: update.exe\n    sha512: ${mode==='corrupt'?Buffer.alloc(64).toString('base64'):checksum}\n    size: ${fixture.length}\npath: update.exe\nsha512: ${checksum}\nreleaseDate: '2026-11-18T00:00:00.000Z'\n`);if(mode==='disconnect'){res.writeHead(200,{'Content-Length':fixture.length+100});res.write(fixture.subarray(0,4));return setTimeout(()=>res.destroy(),30);}res.writeHead(200,{'Content-Length':fixture.length});res.end(fixture);});await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+ const url=`http://127.0.0.1:${server.address().port}`;
+ await app.evaluate(({app},{root,dir,url})=>{const require=process.mainModule.require.bind(process.mainModule);const path=require('node:path'),fs=require('node:fs');const {NsisUpdater}=require(path.join(root,'node_modules/electron-updater'));const config=path.join(dir,'test-update.yml');fs.writeFileSync(config,`provider: generic\nurl: ${url}\nupdaterCacheDirName: qa-cache\n`);global.qaEngine=new NsisUpdater();qaEngine.forceDevUpdateConfig=true;qaEngine.updateConfigPath=config;qaEngine.disableDifferentialDownload=true;qaEngine.disableWebInstaller=true;qaEngine.logger=null;Object.defineProperty(qaEngine.app,'baseCachePath',{get:()=>path.join(dir,'updates')});const {UpdateService,verifyInstaller}=require(path.join(root,'src/updates.cjs'));global.qaUpdate=new UpdateService({engine:qaEngine,prepare:async()=>{},verify:()=>verifyInstaller(qaEngine,path.join(dir,'updates'))});},{root,dir,url});
+ async function call(action){return app.evaluate(async(_,action)=>{try{await qaUpdate[action]();return {ok:true,state:qaUpdate.snapshot()};}catch{return {ok:false,state:qaUpdate.snapshot()};}},action);}
+ assert.equal((await call('check')).ok,false);console.log('PASS metadata 404 keeps current application usable');
+ mode='corrupt';assert.equal((await call('check')).ok,true);assert.equal((await call('download')).ok,false);console.log('PASS real SHA-512 mismatch rejects download');
+ mode='disconnect';await call('check');assert.equal((await call('download')).ok,false);console.log('PASS interrupted download rejects incomplete installer');
+ mode='valid';await call('check');const result=await call('download');assert.equal(result.ok,true);assert.equal(result.state.phase,'ready');await app.evaluate(async()=>{await qaUpdate.verify();});console.log('PASS retry downloads verified package into D-drive cache');
+ await app.evaluate(()=>{process.mainModule.require('node:fs').appendFileSync(qaEngine.downloadedUpdateHelper.file,'tamper');});assert.equal((await call('install')).ok,false);assert.equal((await call('check')).ok,true);assert.equal((await call('download')).ok,true);await app.evaluate(async()=>{await qaUpdate.verify();});console.log('PASS tampered cached package blocked before install; retry available');
+ await page.getByRole('button',{name:/设置/}).last().click();await page.getByText('软件更新',{exact:true}).waitFor();await page.screenshot({path:path.join(dir,'settings.png')});console.log('PASS settings update UI renders');
+ await page.locator('[data-view="today"]:visible').first().click();await page.locator('#quick-title').fill('升级前尚未保存草稿');
+ const session=await page.evaluate(()=>window.captureSessionState());fs.writeFileSync(path.join(dir,'update-session.json'),JSON.stringify(session));
+ await app.close();app=await launch(next);page=await app.firstWindow();await page.waitForFunction(()=>document.querySelector('#quick-title').value==='升级前尚未保存草稿');assert.equal(await page.locator('#quick-title').inputValue(),'升级前尚未保存草稿');assert.equal(fs.existsSync(path.join(dir,'update-session.json')),false);console.log('PASS persisted update session restores draft once after restart');
+ fs.writeFileSync(path.join(dir,'result.json'),JSON.stringify({passed:true,source:'0.4.1',target:after.version,dataDir:dir},null,2));
+ }finally{if(app)await app.close();if(server)server.close();}})().catch(e=>{console.error(e);process.exitCode=1;});
+
+

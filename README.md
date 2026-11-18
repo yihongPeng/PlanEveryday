@@ -2,20 +2,28 @@
 
 一个本地运行的 Windows 个人计划助手。桌面上的小芽团子是入口，点击打开计划，拖动可移动，右键可隐藏或退出。
 
-**下载使用：[最新 Windows 便携版](https://github.com/yihongPeng/PlanEveryday/releases/latest)** · [源码仓库](https://github.com/yihongPeng/PlanEveryday)
+**下载使用：[最新 Windows 安装版](https://github.com/yihongPeng/PlanEveryday/releases/latest)** · [源码仓库](https://github.com/yihongPeng/PlanEveryday)
 
-完整解压后运行 `PlanEveryday.exe`。当前版本需要 Windows 10/11 x64 和可写的 **D 盘**，数据与缓存固定在 `D:\PlanEverydayData`；无需登录。代码采用 [MIT 许可证](LICENSE)，欢迎下载使用和改进。
+下载并运行 `PlanEveryday-Setup-0.5.0.exe`，安装程序会创建桌面入口。当前版本需要 Windows 10/11 x64 和可写的 **D 盘**，数据与缓存固定在 `D:\PlanEverydayData`；无需登录。代码采用 [MIT 许可证](LICENSE)，欢迎下载使用和改进。
 
 设置 → 启动方式 → **开机自启**：默认关闭；开启后登录 Windows 时只显示桌宠与托盘，不弹计划窗口。设置读取系统实际状态，不随数据备份导入。系统启动项和快捷方式属于 Windows 配置，任务、记背和备份仍在 D 盘。
 
 ## 开始体验
 
 - 双击桌面 **芽芽计划** 快捷方式。
-- 或运行 `D:\PlanEveryday\release\0.4.1\PlanEveryday-win32-x64\PlanEveryday.exe`。
+- 或运行 `D:\Programs\PlanEveryday\PlanEveryday.exe`。
 - 首次启动会显示计划小窗和桌宠；右上角 □ 可以最大化，再点击可还原。
 - 关闭窗口只会收起，桌宠和提醒继续运行。完全退出可用托盘右键或设置页的退出按钮。
-- 快捷方式指向发布目录，请保留整个 `release\0.4.1\PlanEveryday-win32-x64` 文件夹，不能只移动其中的 exe。
+- 安装版入口固定在 D:/Programs/PlanEveryday，更新会自动接管；不要单独移动 exe。
 - 0.2.2 使用原生桌宠。收起约 10 秒后释放计划窗口的渲染进程，再打开恢复本次运行的草稿、筛选与阅读位置；提醒始终在后台调度。
+
+## 更新与旧数据
+
+0.4.1 及更早的便携版需要最后手动运行一次安装包；无需搬运数据库或图片，现有 D:/PlanEverydayData 会直接保留。安装前请保存旧版编辑并从设置或托盘正常退出。安装版在设置 → 软件更新中检查、下载、重启更新，不在普通退出时自动安装。下载失败可重试，下载与解压缓存在 D 盘。
+
+升级前自动备份任务、记背和引用图片。数据格式无法识别或迁移失败时停止启动，不用空库替代。应用内更新会保存当前编辑草稿并在重新打开后恢复。卸载默认不删除个人数据。历史便携目录不会擅自删除，更新后请使用新的桌面入口。
+
+当前安装包没有商业代码签名证书；更新使用公开 GitHub Release 的 HTTPS 下载与 SHA-512 校验。Windows 系统管理的快捷方式、注册表和系统日志不属于应用数据目录。具体失败场景验收与边界见 [验收记录](docs/ACCEPTANCE.md)。
 
 ## 怎么做计划
 
@@ -25,7 +33,8 @@
 4. 点击 ☆，选出最多 3 件今日重点；点圆圈标记完成。
 5. 在“安排”选择未来 7 天中的一天，从收集箱逐项安排，也可以多选批量调整日期。
 6. 点击任务标题，编辑备注、优先级或提醒；修改后点击保存。
-7. Ctrl+N 聚焦新增，Ctrl+F 搜索。中文输入法选词不会提交任务。
+7. 点击桌宠、系统提醒或提醒入口会清除当前未读小点，记录仍保留；新提醒会重新点亮。
+8. Ctrl+N 聚焦新增，Ctrl+F 搜索。中文输入法选词不会提交任务。
 
 ## 记背
 

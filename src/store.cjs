@@ -60,6 +60,8 @@ class Store{
  constructor(dbPath){
   if(dbPath!==':memory:')mkdirSync(dirname(dbPath),{recursive:true});
   this.db=new DatabaseSync(dbPath);
+  try {
+  ensure(this.db.prepare('PRAGMA user_version').get().user_version<=1,'数据来自更高版本，请使用新版程序打开');
   this.db.exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000; CREATE TABLE IF NOT EXISTS planner_state (id INTEGER PRIMARY KEY CHECK(id=1), data TEXT NOT NULL)');
   const row=this.db.prepare('SELECT data FROM planner_state WHERE id=1').get();
   this.state=row?JSON.parse(row.data):{tasks:[],events:[],knowledge:[],settings:clone(defaults)};
@@ -67,6 +69,7 @@ class Store{
   if(Array.isArray(this.state.knowledge))for(const k of this.state.knowledge)if(k&&!Object.hasOwn(k,'tags')){k.tags=[];legacy=true;}
   stateValid(this.state);
   if(legacy)this.mutate(()=>{});
+  } catch(error){this.db.close();throw error;}
  }
  summary(){return {settings:clone(this.state.settings),unread:this.state.events.filter(e=>!e.readAt).length,done:this.state.tasks.filter(t=>t.status==='done'&&t.completedAt&&today(t.completedAt)===today()).length};}
  snapshot(){return clone(this.state);}
@@ -109,7 +112,7 @@ class Store{
  toggleFocus(id,replaceId){return this.mutate(s=>{const t=this.get(s,id),day=today();ensure(t.status==='todo'&&t.plannedDate===day,'请先将待办任务安排到今天');if(t.focusDate===day)t.focusDate=null;else{const focused=s.tasks.filter(a=>a.status==='todo'&&a.focusDate===day);if(focused.length>=3){const old=focused.find(a=>a.id===replaceId);ensure(old,'今天最多选择 3 项重点，请先选择要替换的一项');old.focusDate=null;old.updatedAt=new Date().toISOString();}t.focusDate=day;}t.updatedAt=new Date().toISOString();return t;});}
  consume(s,now){const added=[];for(const t of s.tasks){if(t.status==='todo'&&t.reminderAt&&Date.parse(t.reminderAt)<=now&&t.remindedRevision<t.reminderRevision){const event={id:randomUUID(),taskId:t.id,title:t.title,createdAt:new Date(now).toISOString(),readAt:null};if(!s.events.some(e=>e.id===event.id)){s.events.push(event);added.push(event);}t.remindedRevision=t.reminderRevision;}}return added;}
  pollReminders(now=Date.now(),{silent=false}={}){ensure(Number.isFinite(now),'提醒检查时间无效');if(!this.state.tasks.some(t=>t.status==='todo'&&t.reminderAt&&Date.parse(t.reminderAt)<=now&&t.remindedRevision<t.reminderRevision))return [];return this.mutate(s=>this.consume(s,now));}
- markRead(){return this.mutate(s=>{const now=new Date().toISOString();for(const e of s.events)if(!e.readAt)e.readAt=now;});}
+ markRead(ids=null){if(ids!==null)ensure(Array.isArray(ids)&&ids.every(uuid),'提醒标识无效');return this.mutate(s=>{const now=new Date().toISOString();for(const e of s.events)if(!e.readAt&&(ids===null||ids.includes(e.id)))e.readAt=now;});}
  exportBackup(){const {tasks,events,knowledge,settings}=this.snapshot();const portable={};for(const key of Object.keys(defaults))portable[key]=settings[key]??defaults[key];return validateBackup({schemaVersion:3,exportedAt:new Date().toISOString(),tasks,events,knowledge,settings:portable});}
  restoreBackup(input){const backup=validateBackup(input);return this.mutate(s=>{s.tasks=backup.tasks;s.events=backup.events;s.knowledge=backup.knowledge;for(const key of Object.keys(defaults))s.settings[key]=backup.settings[key]??defaults[key];this.consume(s,Date.now());});}
  close(){this.db.close();}
