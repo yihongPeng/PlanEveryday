@@ -9,7 +9,6 @@
   <header class="titlebar"><div class="wordmark"><img src="../../assets/app.png" alt="">芽芽计划 <span>Plan Every Day</span></div><div class="window-controls"><button id="minimize" aria-label="最小化" title="最小化">−</button><button id="maximize" aria-label="最大化" title="最大化 / 还原">□</button><button id="hide" aria-label="收起到托盘" title="收起，芽芽继续陪你">×</button></div></header>
   <div class="app-shell">
     <aside class="sidebar">
-      <div class="sidebar-heading">给每一天，留一点从容。</div>
       <nav aria-label="计划视图">
         <button class="nav-item active" data-view="today"><span class="nav-icon">☀</span><span>我的今天</span><small id="count-today">0</small></button>
         <button class="nav-item" data-view="inbox"><span class="nav-icon">▤</span><span>收集箱</span><small id="count-inbox">0</small></button>
@@ -17,12 +16,11 @@
         <button class="nav-item" data-view="done"><span class="nav-icon">✓</span><span>已完成</span></button>
         <button class="nav-item" data-view="memory"><span class="nav-icon">▧</span><span>记背</span><small id="count-memory">0</small></button>
       </nav>
-      <div class="sidebar-note"><span class="little-sprout">✳</span><p>不必一下子做到很多，<br>从一件小事开始。</p><span class="note-line"></span><small>慢慢来，也是在向前。</small></div>
-      <div class="sidebar-bottom"><button class="nav-item" data-view="events"><span class="nav-icon">♧</span><span>提醒记录</span><small id="count-events"></small></button><button class="nav-item" data-view="settings"><span class="nav-icon">⚙</span><span>偏好设置</span></button><div class="local-note"><i></i> 只存本机 · 离线可用</div></div>
+      <div class="sidebar-bottom"><button class="nav-item" data-view="events"><span class="nav-icon">♧</span><span>提醒记录</span><small id="count-events"></small></button><button class="nav-item" data-view="settings"><span class="nav-icon">⚙</span><span>偏好设置</span></button></div>
     </aside>
     <main class="workspace" id="workspace">
-      <div class="page-top"><div><div class="eyebrow" id="eyebrow">YOUR EVERYDAY, A LITTLE LIGHTER</div><h1 id="page-title">我的今天<span class="heading-dot">.</span></h1><p id="subtitle"></p></div><button id="notifications" class="icon-button" title="提醒记录" aria-label="提醒记录">♧<b id="unread-dot" hidden></b></button></div>
-      <section id="today-banner" class="today-banner"><div><span class="banner-label">一步一步，今天也会很好。</span><p id="progress-text">先写下一件想做的小事吧。</p><div class="progress-track"><div id="progress-bar"></div></div></div><div class="banner-art" aria-hidden="true"><span class="orbit o1"></span><span class="orbit o2"></span><div class="seed"><i class="leaf l1"></i><i class="leaf l2"></i><span class="seed-face">·ᴗ·</span></div><span class="art-star">✧</span></div></section>
+      <div class="page-top"><div><h1 id="page-title">我的今天<span class="heading-dot">.</span></h1><p id="subtitle"></p></div><button id="notifications" class="icon-button" title="提醒记录" aria-label="提醒记录">♧<b id="unread-dot" hidden></b></button></div>
+      <section id="today-banner" class="today-summary"><p id="progress-text"></p></section>
       <section id="task-tools">
         <form id="quick-form" class="quick-form"><span class="add-symbol">＋</span><input id="quick-title" maxlength="200" placeholder="记一件今天要做的事…" aria-label="新任务标题" autocomplete="off"><button type="submit" class="primary-button" id="quick-add" title="Enter 保存">添加 <span>↵</span></button></form>
         <div class="entry-meta"><label>安排到 <input type="date" id="quick-date" aria-label="新任务计划日期"></label><button id="quick-inbox" class="text-button">先放收集箱</button><span class="keyboard-hint">Enter 连续记录</span></div>
@@ -31,7 +29,6 @@
         <div id="batch-bar" class="batch-bar" hidden><span id="batch-count">已选 0 项</span><button data-batch="today">今天</button><button data-batch="tomorrow">明天</button><input type="date" id="batch-date" aria-label="批量安排日期"><button id="batch-apply">安排</button><button data-batch="inbox">收集箱</button></div>
       </section>
       <div class="content-scroll" id="content"></div>
-      <footer class="workspace-footer"><span id="footer-note">给计划一点空间，也给自己一点空间。</span><span class="footer-brand">芽芽 · v0.2</span></footer>
     </main>
     <aside id="detail" class="detail-panel" hidden></aside>
   </div>

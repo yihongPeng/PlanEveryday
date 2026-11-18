@@ -11,10 +11,10 @@
 ## 开始体验
 
 - 双击桌面 **芽芽计划** 快捷方式。
-- 或运行 `D:\PlanEveryday\release\0.4.0\PlanEveryday-win32-x64\PlanEveryday.exe`。
+- 或运行 `D:\PlanEveryday\release\0.4.1\PlanEveryday-win32-x64\PlanEveryday.exe`。
 - 首次启动会显示计划小窗和桌宠；右上角 □ 可以最大化，再点击可还原。
 - 关闭窗口只会收起，桌宠和提醒继续运行。完全退出可用托盘右键或设置页的退出按钮。
-- 快捷方式指向发布目录，请保留整个 `release\0.4.0\PlanEveryday-win32-x64` 文件夹，不能只移动其中的 exe。
+- 快捷方式指向发布目录，请保留整个 `release\0.4.1\PlanEveryday-win32-x64` 文件夹，不能只移动其中的 exe。
 - 0.2.2 使用原生桌宠。收起约 10 秒后释放计划窗口的渲染进程，再打开恢复本次运行的草稿、筛选与阅读位置；提醒始终在后台调度。
 
 ## 怎么做计划
@@ -61,7 +61,7 @@ powershell -ExecutionPolicy Bypass -File scripts/install-shortcut.ps1
 测试发布版本：
 
 ```powershell
-$env:PLANEVERYDAY_EXE = 'D:\PlanEveryday\release\0.4.0\PlanEveryday-win32-x64\PlanEveryday.exe'
+$env:PLANEVERYDAY_EXE = 'D:\PlanEveryday\release\0.4.1\PlanEveryday-win32-x64\PlanEveryday.exe'
 $env:PLANEVERYDAY_TEST_NO_FOCUS = '1'
 node scripts/desktop-test.cjs
 node scripts/native-checks.cjs
@@ -77,3 +77,5 @@ node scripts/media-test.cjs
 0.2.2 正式数据、备份与缓存统一保存在 `D:/PlanEverydayData`。D 盘不可用时停止，不回退 C 盘。旧 C 盘数据已移到 D 盘 legacy-archive-20261117；请勿再使用旧版程序。记背支持 Markdown 标题、列表、强调、引用、代码块、表格与网页链接，编辑保留原文。外部图片显示说明文字而不联网。渲染器使用离线打包的 [markdown-it](https://github.com/markdown-it/markdown-it)。
 
 0.3.0：记背增加多个标签（最多 12 个，每个 24 字）、已有标签复用、未分类、标签筛选与搜索交集。输入用逗号分隔；点击标签即可复习同主题笔记。采用米白与苔绿的紧凑阅读排版，列表含摘要，支持 Markdown。旧内容保留，新备份格式 v3 仍支持导入 v1/v2。
+
+0.4.1：采用“安静的温暖”默认界面，移除持续标语、鼓励横幅和桌宠气泡，保留配色、阅读排版及必要提示。记背阅读页直接呈现标题与正文。

@@ -11,8 +11,8 @@ async function refresh() {
  const unread = events.filter(e => !e.readAt).length;
  const done = tasks.filter(t => t.status === 'done').length;
  document.querySelector('#badge').hidden = !unread;
- document.querySelector('#bubble').textContent = unread ? `${unread} 件事提醒你` : '今天也慢慢来';
- if (lastDone !== null && done > lastDone) { pet.classList.add('celebrate'); document.querySelector('#bubble').textContent = '又完成一件，真好'; setTimeout(() => { pet.classList.remove('celebrate'); refresh(); }, 2200); }
+ pet.title = unread ? `${unread} 条提醒 · 点击打开计划` : '点击打开计划 · 拖动调整位置 · 右键更多';
+ if (lastDone !== null && done > lastDone) { pet.classList.add('celebrate'); setTimeout(() => { pet.classList.remove('celebrate'); refresh(); }, 2200); }
  lastDone = done;
 }
 window.planner.onChange(refresh); refresh();

@@ -55,3 +55,5 @@ body[data-page="memory"] .sidebar-note{display:none}body[data-page="memory"] .si
 .memory-body .hljs-number,.memory-body .hljs-symbol{color:#975023}
 .memory-body .hljs-title,.memory-body .hljs-built_in{color:#245e89}
 .memory-body .hljs-comment,.memory-body .hljs-quote{color:#606b63;font-style:italic}
+
+body[data-page="memory"][data-memory-mode="read"] .page-top,body[data-page="memory"][data-memory-mode="edit"] .page-top{display:none}.memory-toolbar .memory-count{margin:0}.memory-toolbar .memory-count b{font-family:inherit;font-size:16px;font-weight:600}.memory-reading-header h2{margin-top:0}

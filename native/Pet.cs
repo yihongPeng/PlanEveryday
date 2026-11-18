@@ -205,19 +205,12 @@ internal sealed class PetForm : Form {
     }
     private void RenderPet() {
         if (!IsHandleCreated || closing) return;
+        hint.SetToolTip(this, unread > 0 ? "有 " + unread + " 条提醒 · 点击打开计划" : "点击打开计划 · 拖动调整位置 · 右键更多");
         using (Bitmap bitmap = new Bitmap(Width, Height, PixelFormat.Format32bppPArgb)) {
             using (Graphics g = Graphics.FromImage(bitmap)) {
                 g.SmoothingMode = SmoothingMode.AntiAlias;
                 g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
                 g.ScaleTransform(scale, scale);
-                using (GraphicsPath bubble = Rounded(3,2,110,26,12))
-                using (Brush fill = new SolidBrush(C("#fffdf3")))
-                using (Pen border = new Pen(C("#d7dfcb"),1)) { g.FillPath(fill,bubble); g.DrawPath(border,bubble); }
-                string label = unread > 0 ? "有 " + (unread > 99 ? "99+" : unread.ToString()) + " 条提醒" : celebrating ? "完成啦，真好" : "今天也慢慢来";
-                using (Font font = new Font("Microsoft YaHei UI",11,FontStyle.Regular,GraphicsUnit.Pixel))
-                using (Brush text = new SolidBrush(C("#536b42")))
-                using (StringFormat format = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
-                    g.DrawString(label,font,text,new RectangleF(3,2,110,26),format);
                 g.TranslateTransform(0,28);
                 using (Brush shadow = new SolidBrush(Color.FromArgb(32,53,78,50))) g.FillEllipse(shadow,26,89,64,10);
                 using (Pen stem = new Pen(C("#5f7a43"),4)) { stem.StartCap = stem.EndCap = LineCap.Round; g.DrawBezier(stem,58,30,58,23,56,19,53,16); }

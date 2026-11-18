@@ -43,14 +43,13 @@ function render() {
  $('#count-events').textContent = unread || ''; $('#unread-dot').hidden = !unread;
  document.querySelectorAll('[data-view]').forEach(el => el.classList.toggle('active', el.dataset.view === view));
  $('#maximize').textContent = state.maximized ? '❐' : '□'; $('#maximize').setAttribute('aria-label', state.maximized ? '还原窗口' : '最大化');
- const titles = { today: '我的今天', inbox: '收集箱', future: '让计划慢慢展开', done: '每一步，都算数', settings: '按你的节奏', events: '芽芽的提醒', memory:'记背 · 温习手册' };
+ const titles = { today: '我的今天', inbox: '收集箱', future: '接下来 7 天', done: '已完成', settings: '设置', events: '提醒记录', memory:'记背' };
  $('#page-title').innerHTML = `${titles[view]}<span class="heading-dot">.</span>`;
  const dateLabel = new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' });
- const subtitles = { today: `${dateLabel} · 先照顾好眼前的一件事`, inbox: '灵感、琐事、想做的事，先放心放在这里。', future: '选择一天，把想做的事安排进去。', done: '那些已经完成的小事，都在这里。', settings: '让芽芽以你舒服的方式陪伴。', events: '不必急着回应，方便时再看看。', memory:'按主题整理，让每次温习都有方向。' };
- $('#subtitle').textContent = subtitles[view];
+ const subtitles = { today: dateLabel, inbox: '', future: '', done: '', settings: '', events: '', memory:'' };
+ $('#subtitle').textContent = subtitles[view]; $('#subtitle').hidden = !subtitles[view];
  $('#today-banner').hidden = view !== 'today'; $('#task-tools').hidden = ['settings', 'events','memory'].includes(view);
- $('#progress-text').textContent = todays.length ? `今天共 ${todays.length} 件事，已完成 ${complete} 件${complete === todays.length ? '。给自己一个小小的肯定。' : '。按照自己的节奏来。'}` : '先写下一件想做的小事吧。';
- $('#progress-bar').style.width = `${todays.length ? complete / todays.length * 100 : 0}%`;
+ $('#progress-text').textContent = `待办 ${todays.length-complete} · 已完成 ${complete}`;
  $('#quick-title').placeholder = view === 'inbox' ? '先记下来，之后再安排…' : view === 'future' ? `想在${readableDate(day)}做些什么…` : '记一件今天要做的事…';
  $('#week-strip').hidden = view !== 'future';
  if (view === 'future') renderWeek();
@@ -62,7 +61,7 @@ function renderWeek() {
  if (innerWidth < 760) { $('#week-strip').innerHTML = `<label class="compact-day-label">安排哪一天<select id="week-select" aria-label="选择安排日期">${Array.from({length:7},(_,i)=>{const date=localDate(i),count=state.tasks.filter(t=>t.plannedDate===date&&t.status==='todo').length;return `<option value="${date}" ${day===date?'selected':''}>${readableDate(date)} · ${count} 项待办</option>`;}).join('')}</select></label>`; return; }
  $('#week-strip').innerHTML = Array.from({ length: 7 }, (_, i) => {
   const date = localDate(i), d = new Date(`${date}T12:00:00`), count = state.tasks.filter(t => t.plannedDate === date && t.status === 'todo').length;
-  return `<button class="day-button ${date === day ? 'selected' : ''}" data-day="${date}" aria-label="${readableDate(date)}，${count}项待办"><span>${i === 0 ? '今天' : d.toLocaleDateString('zh-CN', { weekday: 'short' })}</span><b>${d.getDate()}</b><small>${count ? count + ' 件事' : '留点空白'}</small></button>`;
+  return `<button class="day-button ${date === day ? 'selected' : ''}" data-day="${date}" aria-label="${readableDate(date)}，${count}项待办"><span>${i === 0 ? '今天' : d.toLocaleDateString('zh-CN', { weekday: 'short' })}</span><b>${d.getDate()}</b><small>${count ? count + ' 件事' : '0 项待办'}</small></button>`;
  }).join('');
 }
 function matching(task) { return task.title.toLocaleLowerCase().includes(search.toLocaleLowerCase()) && (filter === 'all' || task.priority === filter); }
@@ -83,36 +82,35 @@ function group(title, tasks, options = {}) {
  return options.collapse ? `<details><summary class="group-heading">${header}</summary>${rows}</details>` : `<section><h2 class="group-heading">${header}</h2>${rows}</section>`;
 }
 function emptyState(title, text, action = 'add') {
- return `<div class="empty-state"><div class="empty-art">✳</div><h3>${title}</h3><p>${text}</p><div class="empty-actions">${action === 'clear' ? '<button class="secondary-button" data-empty="clear">清除搜索与筛选</button>' : action === 'add' ? '<button class="secondary-button" data-empty="add">＋ 写下第一件事</button><button class="text-button" data-view="inbox">从收集箱安排 →</button>' : ''}</div></div>`;
+ return `<div class="empty-state"><h3>${title}</h3><p>${text}</p><div class="empty-actions">${action === 'clear' ? '<button class="secondary-button" data-empty="clear">清除搜索与筛选</button>' : action === 'add' ? '<button class="secondary-button" data-empty="add">＋ 新增任务</button><button class="text-button" data-view="inbox">从收集箱安排 →</button>' : ''}</div></div>`;
 }
 function renderTasks() {
  const today = localDate(), tasks = state.tasks.filter(matching), todo = tasks.filter(t => t.status === 'todo'); let html = '';
  if (view === 'today') {
   const focus = todo.filter(t => t.plannedDate === today && t.focusDate === today), normal = todo.filter(t => t.plannedDate === today && t.focusDate !== today), overdue = todo.filter(t => t.plannedDate && t.plannedDate < today), done = tasks.filter(t => t.plannedDate === today && t.status === 'done');
   html = group('✦ 今日重点', focus, { limit: true }) + group('待办清单', normal) + group('待重新安排', overdue) + group('已完成', done, { collapse: true });
-  if (!html) html = search || filter !== 'all' ? emptyState('没有找到这件事', '试着换一个关键词，或清除筛选。', 'clear') : emptyState('今天，留一点期待', '把想做的事记下来。<br>一件小事，也值得认真对待。');
-  else if (!focus.length && normal.length) html = `<p class="plan-inbox-note">点 ☆ 标记最多 3 件今日重点，把注意力留给重要的事。</p>` + html;
-  if (!normal.length && !focus.length && done.length && !search) html = `<div class="group-empty">✓ 今天安排的事情都完成了。辛苦啦，也可以继续添加。</div>` + html;
+  if (!html) html = search || filter !== 'all' ? emptyState('没有找到这件事', '试着换一个关键词，或清除筛选。', 'clear') : emptyState('今天还没有安排', '新增任务，或从收集箱安排。');
+  if (!normal.length && !focus.length && done.length && !search) html = `<div class="group-empty">✓ 今日任务已完成</div>` + html;
  } else if (view === 'inbox') {
   html = group('尚未安排', todo.filter(t => !t.plannedDate));
-  if (!html) html = emptyState(search || filter !== 'all' ? '没有找到这件事' : '把脑海里的事，先放下来', '现在不必决定什么时候做，先记下来就好。', search || filter !== 'all' ? 'clear' : 'add');
+  if (!html) html = emptyState(search || filter !== 'all' ? '没有找到这件事' : '收集箱为空', '新增尚未安排日期的任务。', search || filter !== 'all' ? 'clear' : 'add');
  } else if (view === 'future') {
-  html = '<div class="planning-columns">' + group(`${readableDate(day)}的安排`, todo.filter(t => t.plannedDate === day), { empty: '这一天还有空间，从收集箱安排，或直接新增。' });
-  html += group('从收集箱安排', todo.filter(t => !t.plannedDate), { assign: true, empty: '想做的事可以先放在收集箱，之后再慢慢安排。' }) + '</div>';
+  html = '<div class="planning-columns">' + group(`${readableDate(day)}的安排`, todo.filter(t => t.plannedDate === day), { empty: '这一天暂无任务。' });
+  html += group('从收集箱安排', todo.filter(t => !t.plannedDate), { assign: true, empty: '没有待安排的任务。' }) + '</div>';
   const farther = todo.filter(t => t.plannedDate > localDate(6));
   html += group('更远的安排', farther, { collapse: true });
  } else {
-  html = group('已经做到的事', tasks.filter(t => t.status === 'done'));
-  if (!html) html = emptyState('每个完成，都会留在这里', '不着急，从今天的一件小事开始。', search || filter !== 'all' ? 'clear' : 'none');
+  html = group('已完成', tasks.filter(t => t.status === 'done'));
+  if (!html) html = emptyState('暂无已完成任务', '完成的任务会显示在这里。', search || filter !== 'all' ? 'clear' : 'none');
  }
  $('#content').innerHTML = html;
 }
 function renderSettings() {
  const s = state.settings;
  const setting = (key, title, note) => `<div class="settings-row"><div><h3>${title}</h3><p>${note}</p></div><input class="toggle" type="checkbox" data-setting="${key}" aria-label="${title}" ${s[key] ? 'checked' : ''}></div>`;
- $('#content').innerHTML = `${state.petError?'<p class="error-message">桌宠进程已停止。请关闭再打开“显示桌宠”开关恢复；计划与提醒仍正常运行。</p>':''}<h2 class="settings-section">陪伴的方式</h2><div class="settings-card">${setting('petVisible','显示桌宠','点击芽芽打开计划，拖动可以挪位置。')}${setting('petAlwaysOnTop','桌宠保持在最上层','不主动抢焦点，随时都找得到。')}${setting('doNotDisturb','免打扰','不弹出系统通知，提醒仍会保存在记录中。')}</div>
- <h2 class="settings-section">启动方式</h2><div class="settings-card"><div class="settings-row"><div><h3>开机自启</h3><p>登录 Windows 后启动芽芽，只显示桌宠和托盘。<br>计划窗口不会自动弹出；桌宠显隐沿用你的设置。</p><p class="error-message">${escapeHtml(state.startup?.migrationError||state.startup?.note||'')}</p></div><input class="toggle" id="startup-toggle" type="checkbox" aria-label="开机自启" ${state.startup?.enabled?'checked':''} ${state.startup?.supported?'':'disabled'}></div></div><h2 class="settings-section">数据与安心</h2><div class="settings-card"><div class="settings-row"><div><h3>离线使用，只保存在这台电脑</h3><p>不需要账号，也不会上传你的计划。</p></div></div><div class="settings-actions"><button class="secondary-button" data-action="export">导出备份</button><button class="secondary-button" data-action="import">恢复备份</button><button class="text-button" data-action="openDataFolder">打开数据目录</button></div></div>
- <h2 class="settings-section">提醒与入口</h2><div class="settings-card"><div class="settings-row"><div><h3>系统通知${state.notificationSupported && !state.notificationFailed ? '功能已支持' : '暂不可用'}</h3><p>${state.notificationFailed ? '系统通知发送失败，请检查 Windows 通知设置。' : '实际弹出受 Windows 通知权限与专注设置影响。'}<br>${escapeHtml(state.notificationStatus)}<br>即使没有弹窗，仍可在提醒记录中查看。</p></div><div><button class="text-button" data-action="notification:test">发送测试提醒</button><button class="text-button" data-view="events">查看记录</button></div></div><div class="settings-row"><div><h3>关闭窗口 ≠ 退出应用</h3><p>窗口关闭后，点击桌宠或系统托盘即可回来。<br>完全退出后不再提醒，再启动会检查错过的计划。</p></div></div></div><button class="danger-button" data-action="quit">退出芽芽计划</button><p class="muted">芽芽计划 0.3.1 · 为有条不紊，也为轻松一点。</p>`;
+ $('#content').innerHTML = `${state.petError?'<p class="error-message">桌宠进程已停止。请关闭再打开“显示桌宠”开关恢复；计划与提醒仍正常运行。</p>':''}<h2 class="settings-section">桌宠与提醒</h2><div class="settings-card">${setting('petVisible','显示桌宠','点击芽芽打开计划，拖动可以挪位置。')}${setting('petAlwaysOnTop','桌宠保持在最上层','不主动抢焦点，随时都找得到。')}${setting('doNotDisturb','免打扰','不弹出系统通知，提醒仍会保存在记录中。')}</div>
+ <h2 class="settings-section">启动方式</h2><div class="settings-card"><div class="settings-row"><div><h3>开机自启</h3><p>登录 Windows 后启动芽芽，只显示桌宠和托盘。<br>计划窗口不会自动弹出；桌宠显隐沿用你的设置。</p><p class="error-message">${escapeHtml(state.startup?.migrationError||state.startup?.note||'')}</p></div><input class="toggle" id="startup-toggle" type="checkbox" aria-label="开机自启" ${state.startup?.enabled?'checked':''} ${state.startup?.supported?'':'disabled'}></div></div><h2 class="settings-section">数据与备份</h2><div class="settings-card"><div class="settings-row"><div><h3>离线使用，只保存在这台电脑</h3><p>不需要账号，也不会上传你的计划。</p></div></div><div class="settings-actions"><button class="secondary-button" data-action="export">导出备份</button><button class="secondary-button" data-action="import">恢复备份</button><button class="text-button" data-action="openDataFolder">打开数据目录</button></div></div>
+ <h2 class="settings-section">提醒与入口</h2><div class="settings-card"><div class="settings-row"><div><h3>系统通知${state.notificationSupported && !state.notificationFailed ? '功能已支持' : '暂不可用'}</h3><p>${state.notificationFailed ? '系统通知发送失败，请检查 Windows 通知设置。' : '实际弹出受 Windows 通知权限与专注设置影响。'}<br>${escapeHtml(state.notificationStatus)}<br>即使没有弹窗，仍可在提醒记录中查看。</p></div><div><button class="text-button" data-action="notification:test">发送测试提醒</button><button class="text-button" data-view="events">查看记录</button></div></div><div class="settings-row"><div><h3>关闭窗口 ≠ 退出应用</h3><p>窗口关闭后，点击桌宠或系统托盘即可回来。<br>完全退出后不再提醒，再启动会检查错过的计划。</p></div></div></div><button class="danger-button" data-action="quit">退出芽芽计划</button><p class="muted">芽芽计划 0.4.1</p>`;
 }
 function renderEvents() {
  const events = [...state.events].sort((a,b) => b.createdAt.localeCompare(a.createdAt));
