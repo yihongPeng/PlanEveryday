@@ -6,7 +6,7 @@ class NativePet {
   this.screen=screen;this.bounds=bounds;this.visible=true;this.topmost=true;this.dead=false;this.ready=false;
   const point=screen.dipToScreenPoint(bounds);
   const executable=app.isPackaged?path.join(process.resourcesPath,'native','PlanEveryday.Pet.exe'):path.join(__dirname,'..','native','bin','PlanEveryday.Pet.exe');
-  this.child=spawn(executable,['--x',String(point.x),'--y',String(point.y)],{windowsHide:true,stdio:['pipe','pipe','pipe']});
+  this.child=spawn(executable,['--x',String(point.x),'--y',String(point.y),'--parent-pid',String(process.pid)],{windowsHide:true,stdio:['pipe','pipe','pipe']});
   this.pid=this.child.pid;
   this.child.stdin.on('error',()=>{});
   this.child.stderr.resume();

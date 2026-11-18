@@ -44,3 +44,14 @@ body[data-page="memory"] .workspace{padding-top:26px}
 @media(prefers-reduced-motion:reduce){.memory-view button{transition:none}}
 body[data-page="memory"] .sidebar-note{display:none}body[data-page="memory"] .sidebar-heading{font-size:11px;letter-spacing:.05em;color:#738169}
 @media(max-width:759px) and (max-height:600px){body[data-page="memory"] .workspace{padding-top:12px}body[data-page="memory"] .page-top h1{font-size:21px;margin-bottom:10px}body[data-page="memory"] #subtitle{display:none}.memory-toolbar{margin-bottom:9px}.memory-toolbar .memory-eyebrow{display:none}.memory-count{margin:0}.memory-count b{font-size:21px}.memory-search{padding:9px 12px;margin-bottom:9px}.memory-filter-bar{padding-bottom:6px}.memory-view .memory-filter{min-height:30px;padding:4px 10px}.memory-results{min-height:26px;margin:0 0 6px}.memory-view .memory-entry{padding:13px}.memory-entry .memory-excerpt{-webkit-line-clamp:1}.memory-entry-bottom{margin-top:8px}.memory-actions{margin-bottom:10px;padding-top:0}.memory-reading{padding:18px 15px}}
+
+/* Local attachments and quiet, offline code highlighting. */
+.memory-image-tools{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:8px 0}
+.memory-image-tools span{font-size:12px;color:#59665d}
+.memory-image{display:block;max-width:100%;height:auto;border-radius:8px;margin:18px auto;background:#f2f3ef}
+#memory-content.image-drop{outline:2px dashed #356247;background:#eef4ed}
+.memory-body .hljs-keyword,.memory-body .hljs-selector-tag,.memory-body .hljs-literal{color:#804b91}
+.memory-body .hljs-string,.memory-body .hljs-attr{color:#356247}
+.memory-body .hljs-number,.memory-body .hljs-symbol{color:#975023}
+.memory-body .hljs-title,.memory-body .hljs-built_in{color:#245e89}
+.memory-body .hljs-comment,.memory-body .hljs-quote{color:#606b63;font-style:italic}

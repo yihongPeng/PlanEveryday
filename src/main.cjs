@@ -1,9 +1,14 @@
-const { app, BrowserWindow, ipcMain, Menu, Tray, nativeImage, Notification, dialog, screen, powerMonitor, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, Tray, nativeImage, Notification, dialog, screen, powerMonitor, shell, protocol } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const { Store, validateBackup } = require('./store.cjs');
 const { NativePet } = require('./native-pet.cjs');
 const { Startup } = require('./startup.cjs');
+const {Media,MAX_IMAGE,MAX_BACKUP,saveBackup}=require('./media.cjs');
+protocol.registerSchemesAsPrivileged([{scheme:'plan-image',privileges:{standard:true,secure:true,supportFetchAPI:true}}]);
+let media;
+function decodeImage(bytes){if(bytes.length>MAX_IMAGE)throw Error('单张图片不能超过 10 MB');const image=nativeImage.createFromBuffer(bytes);const size=image.getSize();if(image.isEmpty()||!size.width||size.width*size.height>25000000)throw Error('无法读取图片，或图片超过 2500 万像素');return image;}
+function importImage(bytes){return media.add(decodeImage(bytes).toPNG());}
 // This local text UI does not need a persistent hardware GPU context.
 // Native pet transparency is rendered independently by Windows.
 if(process.env.PLANEVERYDAY_HARDWARE_RENDER!=='1') app.disableHardwareAcceleration();
@@ -43,8 +48,10 @@ function showMain(id) {
   clearTimeout(suspendTimer);
   if(id)pendingTaskId=id;
   if (!mainWindow || mainWindow.isDestroyed()) { createMain(); return; }
-  if (mainWindow.isMinimized()) mainWindow.restore();
-  if(testWithoutFocus)mainWindow.showInactive();else{mainWindow.show();mainWindow.focus();}
+  const window=mainWindow;
+  const foreground=()=>{if(window.isDestroyed())return;if(testWithoutFocus)window.showInactive();else{window.show();window.moveTop();window.focus();}};
+  if (window.isMinimized()) {window.once('restore',foreground);window.restore();}
+  foreground();
   mainWindow.webContents.send('state-changed');
 }
 function broadcast() {
@@ -151,6 +158,8 @@ async function start() {
   }
   if(!process.env.PLANEVERYDAY_DATA_DIR){const {migrateData,migrationSources}=require('./data-location.cjs');migrateData(app.getPath('userData'),migrationSources(app.getPath('home')));}
   store = new Store(path.join(app.getPath('userData'), 'planner.sqlite'));
+  media=new Media(app.getPath('userData'));
+  protocol.handle('plan-image',request=>{try{return new Response(media.read(request.url),{headers:{'Content-Type':'image/png','Cache-Control':'no-store'}});}catch{return new Response('Image unavailable',{status:404});}});
   startup=new Startup({app,directory:app.getPath('userData'),supported:process.platform==='win32'&&app.isPackaged&&!process.env.PLANEVERYDAY_DATA_DIR});
   try{startup.migrate();}catch{startupError='开机自启路径更新失败，请关闭后重新开启此选项。';}
   if(!process.argv.includes('--autostart'))createMain(); createPet();
@@ -169,8 +178,10 @@ const actions = {
   'task:ack':id=>{if(pendingTaskId===id)pendingTaskId=null;},
   'notification:test':()=>{if(store.summary().settings.doNotDisturb)throw Error('当前开启免打扰，请关闭后再测试系统通知。');notificationStatus='已请求系统通知，等待结果';notify('芽芽计划 · 测试提醒','看到这条通知，说明系统提醒通道已工作。点击可以返回计划。');return true;},
   'session:restored': () => {uiSession=null;},
-  'knowledge:add': data => store.addKnowledge(data),
-  'knowledge:update': data => store.updateKnowledge(data.id,data.patch),
+  'knowledge:add': data => {media.checkBudget([...store.snapshot().knowledge,{content:typeof data?.content==='string'?data.content:''}]);return store.addKnowledge(data);},
+  'image:add': ({bytes}) => {if(!(bytes instanceof Uint8Array)||bytes.byteLength>MAX_IMAGE)throw Error('图片无效，单张最多 10 MB');return importImage(Buffer.from(bytes));},
+  'image:choose': async () => {const result=await dialog.showOpenDialog(mainWindow,{title:'插入图片',defaultPath:app.getPath('userData'),filters:[{name:'图片',extensions:['png','jpg','jpeg','webp','gif','bmp']}],properties:['openFile','multiSelections']});if(result.canceled)return [];if(result.filePaths.length>12)throw Error('一次最多插入 12 张图片');const bytes=result.filePaths.map(file=>{if(fs.statSync(file).size>MAX_IMAGE)throw Error('单张图片不能超过 10 MB');return fs.readFileSync(file);});const images=bytes.map(b=>decodeImage(b).toPNG());return images.map(b=>media.add(b));},
+  'knowledge:update': data => {const notes=store.snapshot().knowledge.map(k=>k.id===data.id?{...k,content:typeof data.patch?.content==='string'?data.patch.content:k.content}:k);media.checkBudget(notes);return store.updateKnowledge(data.id,data.patch);},
   'knowledge:delete': async ({id}) => {const result=await dialog.showMessageBox(mainWindow,{type:'question',buttons:['保留内容','删除知识点'],defaultId:0,cancelId:0,message:'删除这个知识点？',detail:'删除后无法撤销。',noLink:true});if(result.response!==1)return false;store.deleteKnowledge(id);return true;},
   confirmDiscard: async () => (await dialog.showMessageBox(mainWindow,{type:'question',buttons:['继续编辑','放弃修改'],defaultId:0,cancelId:0,message:'放弃尚未保存的修改？',noLink:true})).response===1,
   add: data => store.addTask(data),
@@ -191,20 +202,23 @@ const actions = {
   hide: () => mainWindow.close(),
   quit: () => app.quit(),
   export: async () => {
-    const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, { title: '导出计划备份', defaultPath: `芽芽计划-${new Date().toISOString().slice(0, 10)}.json`, filters: [{ name: '计划备份', extensions: ['json'] }] });
+    fs.mkdirSync(path.join(app.getPath('userData'),'backups'),{recursive:true});
+    const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, { title: '导出计划与图片备份', defaultPath: path.join(app.getPath('userData'),'backups',`芽芽计划-${new Date().toISOString().slice(0, 10)}.json`), filters: [{ name: '计划与图片备份', extensions: ['json'] }] });
     if (canceled) return false;
-    fs.writeFileSync(filePath, JSON.stringify(store.exportBackup(), null, 2), 'utf8'); return true;
+    saveBackup(filePath,media.export(store.exportBackup())); return true;
   },
   import: async () => {
     const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, { title: '恢复计划备份', filters: [{ name: '计划备份', extensions: ['json'] }], properties: ['openFile'] });
     if (canceled) return false;
-    if (fs.statSync(filePaths[0]).size > 20 * 1024 * 1024) throw Error('备份文件过大，最大支持 20 MB。');
+    if (fs.statSync(filePaths[0]).size > MAX_BACKUP) throw Error('备份文件过大，最大支持 150 MB。');
     const backup = validateBackup(JSON.parse(fs.readFileSync(filePaths[0], 'utf8')));
     const answer = await dialog.showMessageBox(mainWindow, { type: 'warning', message: `恢复 ${backup.tasks.length} 项任务和 ${backup.knowledge?.length||0} 个知识点？`, detail: '将替换当前任务和全部记背内容，旧版备份没有记背内容时将清空当前记背。恢复前会自动保留当前数据备份；过去的提醒不会重新弹出。', buttons: ['取消', '恢复备份'], defaultId: 0, cancelId: 0, noLink: true });
     if (answer.response !== 1) return false;
     const folder = path.join(app.getPath('userData'), 'backups'); fs.mkdirSync(folder, { recursive: true });
-    fs.writeFileSync(path.join(folder, `before-restore-${Date.now()}.json`), JSON.stringify(store.exportBackup()), 'utf8');
-    store.restoreBackup(backup); updatePet(); return true;
+    const current=store.exportBackup();let complete;
+    try{complete=media.export(current);}catch{media.archiveCurrent(current,path.join(folder,`before-restore-recovery-${Date.now()}`));}
+    if(complete)saveBackup(path.join(folder, `before-restore-${Date.now()}.json`),complete);
+    media.restore(backup,()=>store.restoreBackup(backup),decodeImage); updatePet(); return true;
   },
   openLink: ({url}) => {const parsed=new URL(url);if(!['https:','http:'].includes(parsed.protocol))throw Error('仅支持打开 http 或 https 网页链接');return shell.openExternal(parsed.href);},
   openDataFolder: () => shell.openPath(app.getPath('userData'))

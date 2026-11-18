@@ -31,6 +31,13 @@ internal static class PetTests {
     }
 }
 internal static class Program {
+    internal static uint ParentProcess;
+    internal static void OpenPlanner() {
+        // The pet receives the user click; explicitly pass foreground permission
+        // to Electron before sending the asynchronous open request.
+        if (ParentProcess != 0) Native.AllowSetForegroundWindow(ParentProcess);
+        Send("{\"type\":\"open\"}");
+    }
     internal static void Send(string json) {
         try { lock (Console.Out) { Console.WriteLine(json); Console.Out.Flush(); } }
         catch (System.IO.IOException) { }
@@ -48,6 +55,7 @@ internal static class Program {
             if (!int.TryParse(args[i + 1], out value)) continue;
             if (args[i] == "--x") x = value;
             if (args[i] == "--y") y = value;
+            if (args[i] == "--parent-pid" && value > 0) ParentProcess = (uint)value;
         }
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
@@ -77,7 +85,7 @@ internal sealed class PetForm : Form {
         AccessibleName = "芽芽桌宠，点击打开计划，拖动调整位置";
         Cursor = Cursors.Hand;
         menu.Font = new Font("Microsoft YaHei UI", 10f);
-        menu.Items.Add("打开计划", null, delegate { Program.Send("{\"type\":\"open\"}"); });
+        menu.Items.Add("打开计划", null, delegate { Program.OpenPlanner(); });
         menu.Items.Add("隐藏桌宠", null, delegate { Hide(); Program.Send("{\"type\":\"hide\"}"); });
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("退出应用（退出后不再提醒）", null, delegate { Program.Send("{\"type\":\"quit\"}"); });
@@ -179,7 +187,7 @@ internal sealed class PetForm : Form {
         bool wasDrag = dragged || PetMath.IsDrag(pressCursor, Cursor.Position, scale);
         pressed = false; Capture = false;
         if (wasDrag) Constrain(true);
-        else Program.Send("{\"type\":\"open\"}");
+        else Program.OpenPlanner();
     }
     protected override void OnMouseCaptureChanged(EventArgs e) { base.OnMouseCaptureChanged(e); if (!Capture) pressed = false; }
     protected override void OnFormClosed(FormClosedEventArgs e) {
@@ -248,6 +256,7 @@ internal static class Native {
     [DllImport("user32.dll")] internal static extern bool IsWindowVisible(IntPtr window);
     [StructLayout(LayoutKind.Sequential)] internal struct Rect { internal int Left, Top, Right, Bottom; }
     [StructLayout(LayoutKind.Sequential, Pack=1)] private struct Blend { internal byte Op, Flags, Alpha, Format; }
+    [DllImport("user32.dll")] internal static extern bool AllowSetForegroundWindow(uint processId);
     [DllImport("user32.dll")] internal static extern bool SetProcessDpiAwarenessContext(IntPtr context);
     [DllImport("user32.dll")] internal static extern bool SetProcessDPIAware();
     [DllImport("user32.dll")] internal static extern uint GetDpiForWindow(IntPtr window);

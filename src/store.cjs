@@ -53,8 +53,8 @@ function stateValid(state){
  settingsValid(state.settings);
 }
 function validateBackup(input){
- ensure(input&&[1,2,3].includes(input.schemaVersion),'不支持此备份版本');
- const backup=clone(input);if(backup.schemaVersion===1)backup.knowledge=[];if(backup.schemaVersion<3&&Array.isArray(backup.knowledge))for(const k of backup.knowledge)if(k&&!Object.hasOwn(k,'tags'))k.tags=[];stateValid(backup);return backup;
+ ensure(input&&[1,2,3,4].includes(input.schemaVersion),'不支持此备份版本');
+ const backup=clone(input);if(backup.schemaVersion===1)backup.knowledge=[];if(backup.schemaVersion<3&&Array.isArray(backup.knowledge))for(const k of backup.knowledge)if(k&&!Object.hasOwn(k,'tags'))k.tags=[];stateValid(backup);if(backup.schemaVersion===4)require('./media.cjs').validateAttachments(backup);return backup;
 }
 class Store{
  constructor(dbPath){
