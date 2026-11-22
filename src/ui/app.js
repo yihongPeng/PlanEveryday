@@ -34,6 +34,7 @@ function setView(next) {
  if(next==='events'&&state.events.some(e=>!e.readAt))run(async()=>{await api('readEvents');await refresh();});
 }
 function render() {
+ window.MemoryView?.dispose();
  document.body.dataset.page=view;
  const today = localDate(), todos = state.tasks.filter(t => t.status === 'todo'), todays = state.tasks.filter(t => t.plannedDate === today);
  const complete = todays.filter(t => t.status === 'done').length;

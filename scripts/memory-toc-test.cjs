@@ -16,6 +16,7 @@ async function launch(){
 const api=(action,payload)=>page.evaluate(async({action,payload})=>{const result=await window.planner.invoke(action,payload);if(!result.ok)throw Error(result.error);return result.data;},{action,payload});
 async function openMemory(){await page.locator('[data-view="memory"]:visible').first().click();}
 async function save(){await page.locator('[data-memory-save]').click();await page.locator('#memory-reading-title').waitFor();}
+async function outlineOpen(){if(await page.locator('.memory-toc').isHidden())await page.locator('[data-memory-toc-toggle]').click();}
 async function size(width,height){await app.evaluate(({BrowserWindow},{width,height})=>BrowserWindow.getAllWindows().find(w=>w.webContents.getURL().endsWith('index.html')).setBounds({width,height}),{width,height});await page.waitForTimeout(120);}
 (async()=>{
  try{
@@ -33,27 +34,27 @@ async function size(width,height){await app.evaluate(({BrowserWindow},{width,hei
   checks.push('option defaults off, persists without changing source; five parsed headings and unique links');
   for(const [width,height] of [[360,480],[460,680],[1200,850]]){
    await size(width,height);
-   await page.locator('[data-memory-toc-top]').click();
+   await outlineOpen();
    await page.locator('.memory-toc a').nth(3).click();
    const position=await page.evaluate(()=>{const target=document.activeElement,actions=document.querySelector('.memory-actions');return {id:target.id,top:target.getBoundingClientRect().top,barBottom:actions.getBoundingClientRect().bottom,overflow:document.documentElement.scrollWidth>innerWidth};});
    assert.equal('#'+position.id,links[3]);assert.ok(position.top>=position.barBottom+4,JSON.stringify(position));assert.equal(position.overflow,false);
    assert.equal(new URL(page.url()).protocol,'file:');
-   await page.locator('[data-memory-toc-top]').click();await page.screenshot({path:path.join(results,`reading-${width}.png`)});
+   await outlineOpen();await page.screenshot({path:path.join(results,`reading-${width}.png`)});
   }
   await page.locator('.memory-toc a').nth(1).focus();await page.locator('.memory-toc a').nth(1).press('Enter');
-  assert.equal(await page.evaluate(()=>document.activeElement.id),links[1].slice(1));await page.locator('[data-memory-toc-top]').click();
+  assert.equal(await page.evaluate(()=>document.activeElement.id),links[1].slice(1));await outlineOpen();
   checks.push('actual DOM clicks navigate the second duplicate heading, retain local page and clear sticky toolbar at three sizes');
-  await page.locator('.memory-toc summary').click();assert.equal(await page.locator('.memory-toc details').evaluate(el=>el.open),false);
+  await page.locator('[data-memory-toc-toggle]').click();assert.equal(await page.locator('.memory-toc').isHidden(),true);
   const close=page.waitForEvent('close');await page.locator('#hide').click();await close;
-  await app.evaluate(({app})=>app.emit('second-instance',{},[]));page=await app.firstWindow();await page.locator('.memory-toc details').waitFor();
-  assert.equal(await page.locator('.memory-toc details').evaluate(el=>el.open),false);
+  await app.evaluate(({app})=>app.emit('second-instance',{},[]));page=await app.firstWindow();await page.locator('.memory-toc').waitFor({state:'attached'});
+  assert.equal(await page.locator('.memory-toc').isHidden(),true);
   await page.locator('[data-memory-edit]').click();assert.equal(await page.locator('#memory-content').inputValue(),content);
   await size(460,680);await page.locator('#memory-toc-enabled').scrollIntoViewIfNeeded();await page.screenshot({path:path.join(results,'editor-460.png')});
   await page.locator('#memory-toc-enabled').uncheck();await page.locator('#memory-content').fill(content+'\n\n## 新增标题\n\n新增正文');
   const closeDraft=page.waitForEvent('close');await page.locator('#hide').click();await closeDraft;
   await app.evaluate(({app})=>app.emit('second-instance',{},[]));page=await app.firstWindow();await page.locator('#memory-content').waitFor();
   assert.equal(await page.locator('#memory-toc-enabled').isChecked(),false);assert.ok((await page.locator('#memory-content').inputValue()).endsWith('新增正文'));
-  await page.locator('#memory-toc-enabled').check();await save();await page.locator('[data-memory-toc-top]').click();
+  await page.locator('#memory-toc-enabled').check();await save();await outlineOpen();
   assert.equal(await page.locator('.memory-toc a').count(),6);checks.push('collapsed outline and edited toggle/text survive renderer suspension; headings update after save');
   const saved=await api('snapshot');await app.close();app=null;await launch();await openMemory();await page.locator('[data-memory-open]').first().click();
   assert.deepEqual((await api('snapshot')).knowledge,saved.knowledge);assert.equal(await page.locator('.memory-toc a').count(),6);checks.push('normal exit and reopen preserve outline option and exact Markdown');
@@ -61,14 +62,14 @@ async function size(width,height){await app.evaluate(({BrowserWindow},{width,hei
   await page.locator('#memory-content').fill('# <img src=x onerror="window.tocXss=1">\n\n[网页](https://example.com/review)\n\n## 中文');await save();
   assert.equal(await page.locator('.memory-toc img,.memory-body img').count(),0);assert.equal(await page.evaluate(()=>window.tocXss),undefined);
   await app.evaluate(({shell})=>{globalThis.tocExternal=[];shell.openExternal=async url=>{globalThis.tocExternal.push(url);};});
-  await page.locator('.memory-toc a').last().click();assert.deepEqual(await app.evaluate(()=>globalThis.tocExternal),[]);
+  await outlineOpen();await page.locator('.memory-toc a').last().click();assert.deepEqual(await app.evaluate(()=>globalThis.tocExternal),[]);
   await page.locator('.memory-body a').click();assert.deepEqual(await app.evaluate(()=>globalThis.tocExternal),['https://example.com/review']);
   checks.push('escaped hostile heading stays text; outline links stay local while web links use the existing external-link service');
   await page.locator('[data-memory-edit]').click();await page.locator('#memory-toc-enabled').uncheck();await save();assert.equal(await page.locator('.memory-toc').count(),0);
   await page.locator('[data-memory-edit]').click();await page.locator('#memory-content').fill('没有标题的正文');await page.locator('#memory-toc-enabled').check();await save();assert.match(await page.locator('.memory-toc').textContent(),/添加.*标题/);
   checks.push('disabled outline is absent and an enabled outline without headings gives a useful hint');
   await page.locator('[data-memory-edit]').click();const long=Array.from({length:70},(_,i)=>`${i%2?'###':'#'} 第 ${i+1} 节 ${'长标题'.repeat(10)}\n\n正文\n`).join('\n');await page.locator('#memory-content').fill(long);await save();await size(360,480);
-  assert.equal(await page.locator('.memory-toc a').count(),70);assert.ok(await page.locator('.memory-toc ol').evaluate(el=>el.scrollHeight>el.clientHeight));assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+  await outlineOpen();assert.equal(await page.locator('.memory-toc a').count(),70);assert.ok(await page.locator('.memory-toc ol').evaluate(el=>el.scrollHeight>el.clientHeight));assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
   await page.screenshot({path:path.join(results,'long-outline-360.png')});checks.push('70 long headings scroll inside the outline without horizontal page overflow');
   assert.deepEqual(errors,[]);console.log('PASS '+checks.join('\nPASS '));
   fs.writeFileSync(path.join(results,'report.json'),JSON.stringify({passed:true,exe:process.env.PLANEVERYDAY_EXE||'source',data,checks},null,2));

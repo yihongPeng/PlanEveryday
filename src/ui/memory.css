@@ -58,20 +58,32 @@ body[data-page="memory"] .sidebar-note{display:none}body[data-page="memory"] .si
 
 body[data-page="memory"][data-memory-mode="read"] .page-top,body[data-page="memory"][data-memory-mode="edit"] .page-top{display:none}.memory-toolbar .memory-count{margin:0}.memory-toolbar .memory-count b{font-family:inherit;font-size:16px;font-weight:600}.memory-reading-header h2{margin-top:0}
 
-/* Optional per-note outline, with contained scrolling for long documents. */
-.memory-toc{margin:0 0 28px;border:1px solid #dce4d7;border-radius:9px;background:#f3f6ef;color:#36513d}
-.memory-toc summary{padding:12px 14px;cursor:pointer;font-size:14px;font-weight:600;line-height:1.5}
-.memory-toc summary::before{display:inline-block;width:12px;margin-right:5px;font-size:16px;text-align:center}
-.memory-toc summary span{margin-left:8px;font-size:11px;font-weight:400;color:#63725d}
-.memory-toc ol{margin:0;padding:0 12px 12px;list-style:none;max-height:220px;max-height:min(32vh,220px);overflow:auto;overscroll-behavior:contain;scrollbar-width:thin}
+/* The toolbar, reading viewport and outline each retain their own place. */
+body[data-page="memory"][data-memory-mode="read"] .workspace{max-width:1440px;padding-left:24px;padding-right:24px}
+body[data-page="memory"][data-memory-mode="read"] #content{overflow:hidden;padding:0 0 16px}
+.memory-view[data-mode="read"]{max-width:none;height:100%;min-height:0;display:flex;flex-direction:column;padding-bottom:0}
+.memory-view[data-mode="read"] .memory-actions{position:relative;flex:none;margin-bottom:14px;padding:0 0 12px}
+.memory-reading-layout{position:relative;display:grid;grid-template-columns:minmax(0,1fr);flex:1;min-height:0;gap:20px}
+.memory-reading-layout[data-toc-layout="wide"].toc-open{grid-template-columns:minmax(0,1fr) 216px}
+.memory-reading-scroll{min-width:0;min-height:0;height:100%;overflow:auto;overflow-anchor:none;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#ccd4c2 transparent;scroll-padding:16px;padding:0 3px 20px}
+.memory-view[data-mode="read"] .memory-reading{width:100%;max-width:820px;min-height:100%;margin:0 auto;padding:28px 32px}
+.memory-toc{min-height:0;display:flex;flex-direction:column;border:1px solid #dce4d7;border-radius:10px;background:#f3f6ef;color:#36513d;overflow:hidden}
+.memory-toc-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px 12px 12px;border-bottom:1px solid #e0e6da;flex:none}
+.memory-toc-head h3{font-size:14px;font-weight:600;margin:0 0 4px;line-height:1.5}
+.memory-toc-head span{font-size:12px;color:#63725d}
+.memory-view .memory-toc-head button{font-size:12px;padding:6px 8px;background:transparent;border-color:transparent;flex:none}
+.memory-toc ol{margin:0;padding:8px 8px 12px;list-style:none;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#c0cdb7 transparent}
 .memory-toc li{margin:0;padding-left:calc(var(--toc-depth,0)*12px)}
 .memory-toc-depth-1{--toc-depth:1}.memory-toc-depth-2{--toc-depth:2}.memory-toc-depth-3{--toc-depth:3}.memory-toc-depth-4{--toc-depth:4}.memory-toc-depth-5{--toc-depth:5}
-.memory-toc a{display:block;padding:6px 8px;border-radius:5px;color:#356247;font-size:13px;line-height:1.55;text-decoration:none;overflow-wrap:anywhere}
+.memory-toc a{display:block;min-height:34px;padding:7px 8px;border-left:2px solid transparent;border-radius:4px;color:#45604a;font-size:13px;line-height:1.55;text-decoration:none;overflow-wrap:anywhere}
 .memory-toc .memory-toc-depth-0>a{font-weight:600;color:#2e4c35}
 .memory-toc a:hover{background:#e5eddd;text-decoration:underline;text-underline-offset:3px}
-.memory-toc p{margin:0;padding:0 14px 14px;font-size:12px;line-height:1.7;color:#5b6b55}
+.memory-toc a[aria-current="location"]{background:#e1ead8;border-left-color:#356247;color:#294d36;font-weight:600}
+.memory-view [data-memory-toc-toggle][aria-expanded="true"]{background:#e7eedf;border-color:#b7c9aa}
+.memory-reading-layout[data-toc-layout="compact"] .memory-toc{position:absolute;inset:0 0 0 auto;width:min(260px,calc(100% - 36px));z-index:3;box-shadow:-10px 0 26px #263b321a}
+.memory-toc p{margin:0;padding:14px;font-size:12px;line-height:1.7;color:#5b6b55}
 .memory-editor .memory-toc-option{display:flex;align-items:center;gap:9px;min-height:36px;margin:0;font-weight:400;font-size:13px;cursor:pointer}
 .memory-editor .memory-toc-option input{width:16px;height:16px;flex:0 0 16px;accent-color:#356247;margin:0;padding:0}
 .memory-toc-hint{margin:-3px 0 5px;font-size:11px;color:#66745f;line-height:1.6}
-.memory-body :is(h1,h2,h3,h4,h5,h6)[id]{scroll-margin-top:100px}
-@media(max-width:759px){.memory-toc{margin-bottom:22px}.memory-toc summary{padding:10px 12px}.memory-toc ol{padding:0 8px 9px}.memory-toc a{font-size:12px;min-height:32px;box-sizing:border-box}.memory-toc li{padding-left:calc(var(--toc-depth,0)*10px)}}
+.memory-body :is(h1,h2,h3,h4,h5,h6)[id]{scroll-margin-top:16px}
+@media(max-width:759px){body[data-page="memory"][data-memory-mode="read"] .workspace{padding-left:16px;padding-right:16px}.memory-view[data-mode="read"] .memory-reading{padding:22px 18px}.memory-reading-layout{gap:12px}.memory-toc li{padding-left:calc(var(--toc-depth,0)*10px)}.memory-view[data-mode="read"] .memory-actions{gap:8px;margin-bottom:10px}.memory-view[data-mode="read"] .memory-actions button{padding:6px 8px}}

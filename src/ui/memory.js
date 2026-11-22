@@ -2,8 +2,9 @@
 (() => {
  'use strict';
  const storageKey='planner.memory.view.v1';
- const empty=()=>({mode:'list',id:null,query:'',tag:null,drafts:{},tocCollapsed:{}});
- let model=empty(),context,busy=false;
+ const empty=()=>({mode:'list',id:null,query:'',tag:null,drafts:{},tocCollapsed:{},readScroll:{}});
+ let model=empty(),context,busy=false,disposeReading=()=>{};
+ function dispose(){disposeReading();disposeReading=()=>{};}
  function restore(){try{const saved=JSON.parse(sessionStorage.getItem(storageKey)||'null');if(saved&&typeof saved==='object')model={...empty(),...saved,drafts:saved.drafts||{}};}catch{}}
  restore();
  const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -21,12 +22,12 @@
    const depth=levels.length;levels.push(h.level);
    return `<li class="memory-toc-depth-${depth}"><a href="#${esc(h.id)}">${esc(h.text)}</a></li>`;
   }).join('');
-  return `<nav class="memory-toc" aria-label="正文目录"><details ${model.tocCollapsed?.[id]?'':'open'}><summary id="memory-toc-summary">目录 <span>${headings.length} 个标题</span></summary>${links?`<ol>${links}</ol>`:'<p>在正文中添加 #、## 等标题后，这里会自动生成目录。</p>'}</details></nav>`;
+  return `<nav class="memory-toc" id="memory-toc" aria-label="正文目录"><div class="memory-toc-head"><div><h3>目录</h3><span>${headings.length} 个标题</span></div><button data-memory-toc-close aria-label="收起正文目录" title="收起目录">收起</button></div>${links?`<ol>${links}</ol>`:'<p>在正文中添加 #、## 等标题后，这里会自动生成目录。</p>'}</nav>`;
  }
  function scrollToReading(target){
   if(!target)return;
-  const scroller=context.container.closest('#content'),bar=context.container.querySelector('.memory-actions');
-  scroller.scrollTop+=target.getBoundingClientRect().top-scroller.getBoundingClientRect().top-(bar?.offsetHeight||0)-16;
+  const scroller=context.container.querySelector('.memory-reading-scroll');
+  scroller.scrollTop+=target.getBoundingClientRect().top-scroller.getBoundingClientRect().top-16;
   target.focus({preventScroll:true});
  }
  function excerpt(content){return String(content).replace(/```[\s\S]*?```/g,' [代码] ').replace(/!\[([^\]]*)\]\([^)]*\)/g,'$1').replace(/\[([^\]]+)\]\([^)]*\)/g,'$1').replace(/[#*_>`~|]/g,'').replace(/\s+/g,' ').trim().slice(0,110)||'还没有正文，点开后可以继续补充。';}
@@ -35,6 +36,7 @@
  async function act(fn){if(busy)return;busy=true;try{await fn();}catch(e){context.toast(e.message);const error=context.container.querySelector('.memory-error');if(error)error.textContent=e.message;}finally{busy=false;context.container.querySelectorAll('[data-memory-save]').forEach(b=>b.disabled=false);}}
  function filterTag(tag){model.tag=tag;navigate('list',null);}
  function draw(){
+  dispose();
   const {container}=context,k=current(),tags=catalog();
   if(model.mode==='read'&&!k){model.mode='list';model.id=null;persist();}
   container.classList.add('memory-view');container.dataset.mode=model.mode;document.body.dataset.memoryMode=model.mode;
@@ -50,7 +52,7 @@
    container.querySelectorAll('[data-memory-filter]').forEach(b=>b.onclick=()=>filterTag(filters[Number(b.dataset.memoryFilter)].value));
   }else if(model.mode==='read'){
    const doc=window.MemoryMarkdown.renderDocument(k.content);
-   container.innerHTML=`<div class="memory-actions"><button data-memory-back>← 标题列表</button><div>${k.toc?'<button data-memory-toc-top title="回到正文目录">目录 ↑</button>':''}<button data-memory-pin>${k.pinned?'取消置顶':'置顶'}</button><button data-memory-edit>编辑</button><button class="memory-delete" data-memory-delete>删除</button></div></div><article class="memory-reading"><header class="memory-reading-header">${k.pinned?'<span class="memory-pin">置顶</span>':''}<h2 tabindex="-1" id="memory-reading-title">${esc(k.title)}</h2><div class="memory-tags">${(k.tags||[]).length?chips(k.tags):'<span class="memory-untagged">未分类 · 编辑时添加标签</span>'}</div><p class="memory-reading-meta">${new Date(k.updatedAt).toLocaleString('zh-CN')} 更新</p></header>${k.toc?outline(doc.headings,k.id):''}<div class="memory-body">${k.content?doc.html:'<span class="memory-muted">还没有正文，点击「编辑」补充内容。</span>'}</div></article>`;
+   container.innerHTML=`<div class="memory-actions"><button data-memory-back>← 标题列表</button><div>${k.toc?'<button data-memory-toc-toggle aria-controls="memory-toc" aria-expanded="false">目录</button>':''}<button data-memory-pin>${k.pinned?'取消置顶':'置顶'}</button><button data-memory-edit>编辑</button><button class="memory-delete" data-memory-delete>删除</button></div></div><div class="memory-reading-layout"><div class="memory-reading-scroll" tabindex="0" role="region" aria-label="记背正文"><article class="memory-reading"><header class="memory-reading-header">${k.pinned?'<span class="memory-pin">置顶</span>':''}<h2 tabindex="-1" id="memory-reading-title">${esc(k.title)}</h2><div class="memory-tags">${(k.tags||[]).length?chips(k.tags):'<span class="memory-untagged">未分类 · 编辑时添加标签</span>'}</div><p class="memory-reading-meta">${new Date(k.updatedAt).toLocaleString('zh-CN')} 更新</p></header><div class="memory-body">${k.content?doc.html:'<span class="memory-muted">还没有正文，点击「编辑」补充内容。</span>'}</div></article></div>${k.toc?outline(doc.headings,k.id):''}</div>`;
   }else{
    const d=draft();container.innerHTML=`<div class="memory-actions"><button data-memory-back>← 返回${k?'阅读':'列表'}</button><span class="memory-muted">${k?'编辑笔记':'新的知识点'}</span></div><form class="memory-editor"><label for="memory-title">标题 <small>最多 200 字</small></label><input id="memory-title" placeholder="给这个知识点一个清楚的名字" value="${esc(d.title)}" required><label for="memory-tags">标签 <small>最多 12 个，每个 24 字</small></label><input id="memory-tags" placeholder="例如：C++，网络编程，待复习" value="${esc(d.tags)}" aria-describedby="memory-tags-hint"><p class="memory-input-hint" id="memory-tags-hint">用逗号分隔。一个知识点可以属于多个主题。</p>${tags.length?`<div class="memory-tag-suggestions"><span>选用已有标签</span>${tags.slice(0,20).map(t=>`<button type="button" class="memory-tag" data-memory-suggest="${esc(t.label)}">＋ ${esc(t.label)}</button>`).join('')}</div>`:''}<label class="memory-toc-option" for="memory-toc-enabled"><input type="checkbox" id="memory-toc-enabled" ${d.toc?'checked':''} aria-describedby="memory-toc-hint">生成标题目录</label><p class="memory-toc-hint" id="memory-toc-hint">根据正文标题自动生成，阅读时点击跳转。</p><label for="memory-content">正文 <small>支持 Markdown · 最多 50,000 字</small></label><div class="memory-image-tools"><button type="button" data-memory-image>＋ 插入图片</button><span>也可在正文粘贴截图、拖入图片 · 单张 10 MB</span></div><textarea id="memory-content" placeholder="# 核心概念&#10;&#10;用 **加粗** 标记重点，用 - 整理要点…">${esc(d.content)}</textarea><p class="memory-draft-hint">草稿在本次运行中保留，点击保存后可在下次启动时继续阅读。</p><p class="memory-error" role="alert"></p><div class="memory-editor-footer"><button type="button" data-memory-back>返回并保留草稿</button><button class="primary" data-memory-save type="submit" ${busy?'disabled':''}>保存</button></div></form>`;
   }
@@ -63,9 +65,7 @@
     else context.toast('找不到对应标题，请检查链接');
    }else act(()=>context.api('openLink',{url:href}));
   }};
-  const tocDetails=container.querySelector('.memory-toc details');
-  if(tocDetails)tocDetails.ontoggle=()=>{if(!tocDetails.isConnected)return;model.tocCollapsed||={};model.tocCollapsed[k.id]=!tocDetails.open;persist();};
-  const tocTop=container.querySelector('[data-memory-toc-top]');if(tocTop)tocTop.onclick=()=>{tocDetails.open=true;scrollToReading(container.querySelector('#memory-toc-summary'));};
+  if(model.mode==='read')disposeReading=window.MemoryOutline.attach(container,k.id,model,persist);
   container.querySelectorAll('[data-memory-new]').forEach(b=>b.onclick=()=>{navigate('edit',null);container.querySelector('#memory-title')?.focus();});
   container.querySelectorAll('[data-memory-open]').forEach(b=>b.onclick=()=>{navigate('read',b.dataset.memoryOpen);container.querySelector('#memory-reading-title')?.focus();});
   container.querySelectorAll('[data-memory-back]').forEach(b=>b.onclick=()=>navigate(model.mode==='edit'&&current()?'read':'list'));
@@ -101,5 +101,5 @@
   if(focusKey){const target=container.querySelector('#'+focusKey);target?.focus({preventScroll:true});if(position&&target?.setSelectionRange)target.setSelectionRange(...position);if(target)target.scrollTop=inputScroll;}
   if(scroller)scroller.scrollTop=scrollTop;
  }
- window.MemoryView={resetAfterRestore(){model=empty();persist();},restoreSession:restore,render(options){context=options;draw();},focusNew(){navigate('edit',null);context.container.querySelector('#memory-title')?.focus();},focusSearch(){navigate('list');context.container.querySelector('#memory-search')?.focus();}};
+ window.MemoryView={dispose,resetAfterRestore(){dispose();model=empty();persist();},restoreSession:restore,render(options){context=options;draw();},focusNew(){navigate('edit',null);context.container.querySelector('#memory-title')?.focus();},focusSearch(){navigate('list');context.container.querySelector('#memory-search')?.focus();}};
 })();
