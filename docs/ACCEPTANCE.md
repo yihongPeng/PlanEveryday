@@ -291,4 +291,10 @@ Windows 自身注册表、快捷方式、系统日志不属于应用数据存储
 
 3 份预览库已保存内容先归档到 `D:/PlanEverydayData/backups/preview-content-20261123.zip`，逐项 SHA-256 验证成功。清理使用明确目录列表，校验解析后的路径仍位于指定根内，拒绝重解析点；桌面快捷方式先核对目标。共移除 23 个目标，包含 3 个验收快捷方式、5 份临时程序、3 份预览数据目录、相关提取/缓存目录及一次性脚本，释放 1,956,248,174 字节。清理目标全部消失，源码测试、本文、精简报告及历史正式发布包保留。正式安装位置、个人数据、ReadHelper 未修改。
 
-原位于已清理目录的部分轻量报告已集中到 `test-results/release-055/`，并保存 `preview-cleanup.json`；该目录忽略提交。GitHub 发布结果在公开校验后追加。
+原位于已清理目录的部分轻量报告已集中到 `test-results/release-055/`，并保存 `preview-cleanup.json`；该目录忽略提交。清理后再次检查，验收快捷方式、release/previews 子目录与预览数据子目录均为零，内容备份压缩包为 4,488 字节。
+
+### 0.5.5 公开结果
+
+功能提交 `134bcca527f66a32ae379266e875dc51596a45b5` 已推送到 main，作为 v0.5.5 发布目标。安装包、blockmap 与 latest.yml 在草稿阶段上传完成，各附件远端状态、size、SHA-256 与本地逐项匹配后公开为最新版。公开后再次核对非草稿与三个附件；匿名请求 `/releases/latest/download/latest.yml` 返回 HTTP 200、版本 0.5.5，内容与本地元数据逐字节一致。报告 `github-assets.json`、`public-metadata-check.json` 保存在上述本地证据目录。
+
+发布地址：https://github.com/yihongPeng/PlanEveryday/releases/tag/v0.5.5 。桌面安装版由用户自行更新，本轮未进行实际线上升级或屏幕操作。
