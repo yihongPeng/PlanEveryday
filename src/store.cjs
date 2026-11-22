@@ -34,6 +34,7 @@ function knowledgeValid(k){
  ensure(typeof k.title==='string'&&k.title.trim().length>0&&[...k.title].length<=200,'记背标题需要 1–200 个字符');
  ensure(typeof k.content==='string'&&[...k.content].length<=50000,'记背正文不能超过 50,000 个字符');
  ensure(typeof k.pinned==='boolean','置顶状态不正确');
+ ensure(!Object.hasOwn(k,'toc')||typeof k.toc==='boolean','目录开关格式不正确');
  ensure(JSON.stringify(normalizeTags(k.tags))===JSON.stringify(k.tags),'标签格式不正确或重复');
  ensure(instant(k.createdAt)&&instant(k.updatedAt),'记背时间格式不正确');
 }
@@ -79,8 +80,8 @@ class Store{
   try{this.db.prepare('INSERT INTO planner_state(id,data) VALUES(1,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data').run(JSON.stringify(next));this.db.exec('COMMIT');}catch(error){try{this.db.exec('ROLLBACK');}catch{}throw new Error('保存失败，请检查磁盘空间和数据目录权限后重试。',{cause:error});}
   this.state=next;return clone(result);
  }
- addKnowledge(input){return this.mutate(s=>{ensure(input&&typeof input==='object','记背内容格式不正确');const now=new Date().toISOString();const k={id:randomUUID(),title:typeof input.title==='string'?input.title.trim():input.title,content:input.content===undefined?'':input.content,pinned:input.pinned===undefined?false:input.pinned,tags:normalizeTags(input.tags===undefined?[]:input.tags),createdAt:now,updatedAt:now};knowledgeValid(k);s.knowledge.push(k);return k;});}
- updateKnowledge(id,patch){return this.mutate(s=>{const k=s.knowledge.find(k=>k.id===id);ensure(k,'记背条目不存在，请刷新列表');ensure(patch&&typeof patch==='object'&&!Array.isArray(patch),'记背修改格式不正确');for(const key of Object.keys(patch)){ensure(['title','content','pinned','tags'].includes(key),'不支持修改此记背字段');k[key]=key==='tags'?normalizeTags(patch[key]):key==='title'&&typeof patch[key]==='string'?patch[key].trim():patch[key];}k.updatedAt=new Date().toISOString();return k;});}
+ addKnowledge(input){return this.mutate(s=>{ensure(input&&typeof input==='object','记背内容格式不正确');const now=new Date().toISOString();const k={id:randomUUID(),title:typeof input.title==='string'?input.title.trim():input.title,content:input.content===undefined?'':input.content,pinned:input.pinned===undefined?false:input.pinned,toc:input.toc===undefined?false:input.toc,tags:normalizeTags(input.tags===undefined?[]:input.tags),createdAt:now,updatedAt:now};knowledgeValid(k);s.knowledge.push(k);return k;});}
+ updateKnowledge(id,patch){return this.mutate(s=>{const k=s.knowledge.find(k=>k.id===id);ensure(k,'记背条目不存在，请刷新列表');ensure(patch&&typeof patch==='object'&&!Array.isArray(patch),'记背修改格式不正确');for(const key of Object.keys(patch)){ensure(['title','content','pinned','tags','toc'].includes(key),'不支持修改此记背字段');k[key]=key==='tags'?normalizeTags(patch[key]):key==='title'&&typeof patch[key]==='string'?patch[key].trim():patch[key];}k.updatedAt=new Date().toISOString();return k;});}
  deleteKnowledge(id){return this.mutate(s=>{ensure(s.knowledge.some(k=>k.id===id),'记背条目不存在，请刷新列表');s.knowledge=s.knowledge.filter(k=>k.id!==id);});}
  get(state,id){const t=state.tasks.find(t=>t.id===id);ensure(t,'任务不存在，请刷新列表');return t;}
  addTask(input){return this.mutate(s=>{const now=new Date().toISOString();const t={id:randomUUID(),title:typeof input.title==='string'?input.title.trim():input.title,notes:input.notes??'',plannedDate:input.plannedDate??null,priority:input.priority??'normal',status:'todo',focusDate:null,createdAt:now,updatedAt:now,completedAt:null,reminderAt:null,reminderRevision:0,remindedRevision:0};if(input.reminderAt!==undefined&&input.reminderAt!==null)this.reminder(t,input.reminderAt);taskValid(t);s.tasks.push(t);return t;});}

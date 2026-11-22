@@ -19,3 +19,15 @@ test('invalid image and failed restore cannot change current database or leave n
  const dir=fs.mkdtempSync(path.resolve('test-results/media-fail-')),media=new Media(dir),s=new Store(':memory:');
  try{assert.throws(()=>media.add(Buffer.from('<svg/>')));assert.throws(()=>media.add(Buffer.alloc(11*1024*1024)));const url=media.add(png);s.addKnowledge({title:'图片',content:`![](${url})`});const backup=media.export(s.exportBackup());const target=new Media(path.join(dir,'target'));assert.throws(()=>target.restore(backup,()=>{throw Error('disk full');}));assert.throws(()=>target.read(url));const before=s.snapshot();const bad=structuredClone(backup);bad.attachments=[];assert.throws(()=>s.restoreBackup(bad));assert.deepEqual(s.snapshot(),before);}finally{s.close();}
 });
+
+test('v4 image backup round-trips the optional knowledge outline preference',()=>{
+ const dir=fs.mkdtempSync(path.resolve('test-results/media-toc-')),media=new Media(dir),source=new Store(':memory:'),restored=new Store(':memory:');
+ try{
+  const uri=media.add(png),note=source.addKnowledge({title:'图文目录',content:`# 图解\n\n![图](${uri})`,toc:true});
+  const backup=media.export(source.exportBackup());assert.equal(backup.schemaVersion,4);assert.equal(backup.knowledge[0].toc,true);
+  const target=new Media(path.join(dir,'target'));target.restore(backup,()=>restored.restoreBackup(backup));
+  assert.deepEqual(restored.snapshot().knowledge,[note]);assert.deepEqual(target.read(uri),png);
+  const bad=structuredClone(backup);bad.knowledge[0].toc='true';const before=restored.snapshot();
+  assert.throws(()=>target.restore(bad,()=>restored.restoreBackup(bad)));assert.deepEqual(restored.snapshot(),before);
+ }finally{source.close();restored.close();}
+});

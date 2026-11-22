@@ -57,3 +57,21 @@ body[data-page="memory"] .sidebar-note{display:none}body[data-page="memory"] .si
 .memory-body .hljs-comment,.memory-body .hljs-quote{color:#606b63;font-style:italic}
 
 body[data-page="memory"][data-memory-mode="read"] .page-top,body[data-page="memory"][data-memory-mode="edit"] .page-top{display:none}.memory-toolbar .memory-count{margin:0}.memory-toolbar .memory-count b{font-family:inherit;font-size:16px;font-weight:600}.memory-reading-header h2{margin-top:0}
+
+/* Optional per-note outline, with contained scrolling for long documents. */
+.memory-toc{margin:0 0 28px;border:1px solid #dce4d7;border-radius:9px;background:#f3f6ef;color:#36513d}
+.memory-toc summary{padding:12px 14px;cursor:pointer;font-size:14px;font-weight:600;line-height:1.5}
+.memory-toc summary::before{display:inline-block;width:12px;margin-right:5px;font-size:16px;text-align:center}
+.memory-toc summary span{margin-left:8px;font-size:11px;font-weight:400;color:#63725d}
+.memory-toc ol{margin:0;padding:0 12px 12px;list-style:none;max-height:220px;max-height:min(32vh,220px);overflow:auto;overscroll-behavior:contain;scrollbar-width:thin}
+.memory-toc li{margin:0;padding-left:calc(var(--toc-depth,0)*12px)}
+.memory-toc-depth-1{--toc-depth:1}.memory-toc-depth-2{--toc-depth:2}.memory-toc-depth-3{--toc-depth:3}.memory-toc-depth-4{--toc-depth:4}.memory-toc-depth-5{--toc-depth:5}
+.memory-toc a{display:block;padding:6px 8px;border-radius:5px;color:#356247;font-size:13px;line-height:1.55;text-decoration:none;overflow-wrap:anywhere}
+.memory-toc .memory-toc-depth-0>a{font-weight:600;color:#2e4c35}
+.memory-toc a:hover{background:#e5eddd;text-decoration:underline;text-underline-offset:3px}
+.memory-toc p{margin:0;padding:0 14px 14px;font-size:12px;line-height:1.7;color:#5b6b55}
+.memory-editor .memory-toc-option{display:flex;align-items:center;gap:9px;min-height:36px;margin:0;font-weight:400;font-size:13px;cursor:pointer}
+.memory-editor .memory-toc-option input{width:16px;height:16px;flex:0 0 16px;accent-color:#356247;margin:0;padding:0}
+.memory-toc-hint{margin:-3px 0 5px;font-size:11px;color:#66745f;line-height:1.6}
+.memory-body :is(h1,h2,h3,h4,h5,h6)[id]{scroll-margin-top:100px}
+@media(max-width:759px){.memory-toc{margin-bottom:22px}.memory-toc summary{padding:10px 12px}.memory-toc ol{padding:0 8px 9px}.memory-toc a{font-size:12px;min-height:32px;box-sizing:border-box}.memory-toc li{padding-left:calc(var(--toc-depth,0)*10px)}}

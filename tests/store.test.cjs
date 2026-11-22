@@ -24,3 +24,33 @@ test('knowledge v2 backups validate and v1 restore replaces knowledge safely',t=
 test('knowledge creation rejects malformed fields and failed restore preserves knowledge on disk',t=>{const x=setup(t);for(const input of [{title:'知识',content:null},{title:'知识',pinned:null},{title:'知识',pinned:0}])assert.throws(()=>x.s.addKnowledge(input));const k=x.s.addKnowledge({title:'原知识',content:'保留'});const backup=x.s.exportBackup();backup.knowledge[0].content='替换';x.s.db.exec('PRAGMA query_only=ON');assert.throws(()=>x.s.restoreBackup(backup));assert.equal(x.reopen().snapshot().knowledge[0].content,'保留');assert.equal(x.s.snapshot().knowledge[0].id,k.id);});
 test('native summary omits task and knowledge bodies and returns independent settings',t=>{const {s}=setup(t);s.addKnowledge({title:'知识',content:'大量正文'});s.addTask({title:'完成项'});const item=s.snapshot().tasks[0];s.updateTask(item.id,{status:'done'});const summary=s.summary();assert.deepEqual(Object.keys(summary).sort(),['done','settings','unread']);assert.equal(summary.done,1);summary.settings.petVisible=false;assert.equal(s.summary().settings.petVisible,true);});
 test('acknowledging existing reminders clears pet dot, preserves records, and new reminders light it again',t=>{const x=setup(t),s=x.s;const now=Date.now();s.addTask({title:'提醒一',reminderAt:new Date(now+60000).toISOString()});s.pollReminders(now+61000);const ids=s.snapshot().events.map(e=>e.id);s.markRead(ids);assert.equal(s.summary().unread,0);assert.equal(s.snapshot().events.length,1);s.addTask({title:'提醒二',reminderAt:new Date(now+120000).toISOString()});s.pollReminders(now+121000);s.markRead(ids);assert.equal(s.summary().unread,1);s.markRead();assert.equal(x.reopen().summary().unread,0);assert.equal(x.s.snapshot().events.length,2);});
+
+test('knowledge outline preference persists and round-trips without rewriting Markdown',t=>{
+ const x=setup(t),content='# 原始正文\n\n## 细节';
+ const k=x.s.addKnowledge({title:'带目录',content,toc:true});
+ assert.equal(k.toc,true);
+ assert.equal(x.reopen().snapshot().knowledge[0].toc,true);
+ const backup=x.s.exportBackup();
+ x.s.updateKnowledge(k.id,{toc:false});
+ x.s.restoreBackup(backup);
+ assert.equal(x.s.snapshot().knowledge[0].toc,true);
+ assert.equal(x.s.snapshot().knowledge[0].content,content);
+ x.s.updateKnowledge(k.id,{toc:false});
+ assert.equal(x.reopen().snapshot().knowledge[0].toc,false);
+ assert.equal(x.s.addKnowledge({title:'默认关闭'}).toc,false);
+});
+test('outline preference accepts legacy omission but rejects invalid values and failed writes',t=>{
+ const x=setup(t),k=x.s.addKnowledge({title:'原文',content:'# 标题',toc:true});
+ const backup=x.s.exportBackup();delete backup.knowledge[0].toc;
+ x.s.restoreBackup(backup);assert.equal(x.reopen().snapshot().knowledge[0].toc,undefined);
+ for(const toc of [null,'yes',1,[],{}]){
+  assert.throws(()=>x.s.addKnowledge({title:'错误',toc}));
+  assert.throws(()=>x.s.updateKnowledge(k.id,{toc}));
+  const bad=structuredClone(backup);bad.knowledge[0].toc=toc;
+  assert.throws(()=>x.s.restoreBackup(bad));
+ }
+ const before=x.s.snapshot();x.s.db.exec('PRAGMA query_only=ON');
+ assert.throws(()=>x.s.updateKnowledge(k.id,{toc:true}));
+ assert.deepEqual(x.s.snapshot(),before);
+ assert.deepEqual(x.reopen().snapshot(),before);
+});

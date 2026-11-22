@@ -8,6 +8,24 @@
  const tableClose=md.renderer.rules.table_close||(()=>'</table>');
  md.renderer.rules.table_open=(...args)=>'<div class="md-table-scroll" tabindex="0" aria-label="表格，可横向滚动">'+tableOpen(...args);
  md.renderer.rules.table_close=(...args)=>tableClose(...args)+'</div>';
- const api={render:source=>md.render(String(source||''))};
+ function headingText(tokens){return (tokens||[]).map(token=>{
+  if(token.type==='image')return headingText(token.children)||token.content;
+  if(token.type==='softbreak'||token.type==='hardbreak')return ' ';
+  return token.type==='text'||token.type==='code_inline'?token.content:'';
+ }).join('').trim();}
+ function renderDocument(source){
+  const env={},tokens=md.parse(String(source||''),env),headings=[],used=new Set();
+  for(let i=0;i<tokens.length;i++){
+   const token=tokens[i];if(token.type!=='heading_open')continue;
+   const text=headingText(tokens[i+1]?.children)||'未命名标题';
+   const slug=text.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}\p{M}\s_-]/gu,'').trim().replace(/\s+/g,'-')||'section';
+   const base='memory-heading-'+slug;let id=base,suffix=2;
+   while(used.has(id))id=base+'-'+suffix++;
+   used.add(id);token.attrSet('id',id);token.attrSet('tabindex','-1');
+   headings.push({id,level:Number(token.tag.slice(1)),text});
+  }
+  return {html:md.renderer.render(tokens,md.options,env),headings};
+ }
+ const api={render:source=>renderDocument(source).html,renderDocument};
  if(typeof module==='object'&&module.exports)module.exports=api;else root.MemoryMarkdown=api;
 })(typeof window!=='undefined'?window:globalThis);
