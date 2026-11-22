@@ -2,7 +2,7 @@ const {spawn}=require('node:child_process');
 const {createInterface}=require('node:readline');
 const path=require('node:path');
 class NativePet {
- constructor({app,screen,bounds,onOpen,onMove,onHide,onQuit,onError}) {
+ constructor({app,screen,bounds,onOpen,onToggleSize,onMove,onHide,onQuit,onError}) {
   this.screen=screen;this.bounds=bounds;this.visible=true;this.topmost=true;this.dead=false;this.ready=false;
   const point=screen.dipToScreenPoint(bounds);
   const executable=app.isPackaged?path.join(process.resourcesPath,'native','PlanEveryday.Pet.exe'):path.join(__dirname,'..','native','bin','PlanEveryday.Pet.exe');
@@ -15,6 +15,7 @@ class NativePet {
     if(event.type==='ready'){this.ready=true;this.sendState();}
     if(event.type==='status')this.status=event;
     if(event.type==='open')onOpen();
+    if(event.type==='toggle-size')onToggleSize();
     if(event.type==='hide')onHide();
     if(event.type==='quit')onQuit();
     if(event.type==='move'&&Number.isFinite(event.x)&&Number.isFinite(event.y)){const p=screen.screenToDipPoint({x:event.x,y:event.y});this.bounds={...this.bounds,...p};onMove(this.bounds);}

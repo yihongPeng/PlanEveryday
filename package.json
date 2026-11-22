@@ -1,7 +1,7 @@
 {
   "name": "planeveryday",
   "productName": "芽芽计划",
-  "version": "0.5.4",
+  "version": "0.5.5",
   "description": "A quiet personal planner with a desktop companion",
   "main": "src/main.cjs",
   "scripts": {

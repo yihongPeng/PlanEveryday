@@ -23,7 +23,7 @@ app.setAppLogsPath(path.join(app.getPath('userData'),'logs'));
 const appId = process.env.PLANEVERYDAY_DATA_DIR ? 'local.PlanEveryday.QA' : 'local.PlanEveryday.Desktop';
 app.setAppUserModelId(appId);
 let mainWindow, petWindow, tray, store, quitting = false, timer, dragOrigin, notifications = new Set();
-let suspendTimer, boundsTimer, uiSession = null, pendingTaskId = null, wasMaximized = false;
+let suspendTimer, boundsTimer, uiSession = null, pendingTaskId = null, wasMaximized = false, mainReady = false;
 let petError = false;
 let startup,startupError='',updates;
 const suspendMs = process.env.PLANEVERYDAY_DATA_DIR && process.env.PLANEVERYDAY_SUSPEND_MS ? Math.max(300, Number(process.env.PLANEVERYDAY_SUSPEND_MS)) : 10000;
@@ -53,6 +53,7 @@ function showMain(id) {
   clearTimeout(suspendTimer);
   if(id)pendingTaskId=id;
   if (!mainWindow || mainWindow.isDestroyed()) { createMain(); return; }
+  if (!mainReady) return;
   const window=mainWindow;
   const foreground=()=>{if(window.isDestroyed())return;if(testWithoutFocus)window.showInactive();else{window.show();window.moveTop();window.focus();}};
   if (window.isMinimized()) {window.once('restore',foreground);window.restore();}
@@ -64,6 +65,16 @@ function acknowledgeReminders(){
  try{store.markRead();broadcast();}catch(error){dialog.showErrorBox('无法保存提醒状态',error.message);}
 }
 function openFromPet(){acknowledgeReminders();showMain();}
+function toggleMainSizeFromPet(){
+  acknowledgeReminders();
+  if(!mainWindow || mainWindow.isDestroyed() || !mainReady){
+    wasMaximized=!wasMaximized;showMain();return;
+  }
+  const window=mainWindow;
+  const toggle=()=>{if(window.isDestroyed())return;if(window.isMaximized())window.unmaximize();else window.maximize();};
+  if(window.isMinimized()){window.once('restore',toggle);showMain();}
+  else {showMain();toggle();}
+}
 function broadcast() {
   for (const w of [mainWindow, petWindow]) if (w && !w.isDestroyed() && w.webContents && (w !== mainWindow || w.isVisible())) w.webContents.send('state-changed');
   if (petWindow?.setState) petWindow.setState(store.summary());
@@ -110,13 +121,14 @@ function poll(compensation = false) {
   } catch (error) { console.error('Reminder scan failed:', error.code || error.name); }
 }
 function createMain() {
+  mainReady=false;
   const settings = store.summary().settings;
   const area = screen.getPrimaryDisplay().workArea;
   mainWindow = new BrowserWindow({ ...visibleBounds(settings.windowBounds, { x: area.x + Math.round((area.width - 460) / 2), y: area.y + 50, width: 460, height: 680 }), minWidth: 360, minHeight: 480, title: '芽芽计划', icon: iconPath, frame: false, backgroundColor: '#F6F5F1', show: false, focusable:!testWithoutFocus, webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true } });
   secureWindow(mainWindow);
   mainWindow.loadFile(ui('index.html'));
   const window = mainWindow;
-  mainWindow.once('ready-to-show', () => { if(wasMaximized) window.maximize(); showMain(); });
+  mainWindow.once('ready-to-show', () => { if(wasMaximized) window.maximize(); mainReady=true; showMain(); });
   mainWindow.on('close', e => {
     if (quitting) return;
     e.preventDefault(); mainWindow.hide();
@@ -143,14 +155,15 @@ function createMain() {
     }, 350);
   };
   mainWindow.on('resize', saveBounds); mainWindow.on('move', saveBounds);
-  mainWindow.on('maximize', broadcast); mainWindow.on('unmaximize', broadcast);
+  mainWindow.on('maximize', () => {wasMaximized=true;broadcast();});
+  mainWindow.on('unmaximize', () => {wasMaximized=false;broadcast();});
 }
 function createPet() {
   const settings=store.summary().settings, area=screen.getPrimaryDisplay().workArea;
   const bounds=visibleBounds(settings.petPosition,{x:area.x+area.width-146,y:area.y+area.height-150,width:116,height:132});
   if(process.platform==='win32' && process.env.PLANEVERYDAY_WEB_PET!=='1') {
     petError=false;
-    petWindow=new NativePet({app,screen,bounds,onOpen:()=>openFromPet(),onMove:position=>store.setSettings({petPosition:position}),onHide:()=>{store.setSettings({petVisible:false});updatePet();broadcast();},onQuit:()=>app.quit(),onError:()=>{petError=true;broadcast();}});
+    petWindow=new NativePet({app,screen,bounds,onOpen:()=>openFromPet(),onToggleSize:()=>toggleMainSizeFromPet(),onMove:position=>store.setSettings({petPosition:position}),onHide:()=>{store.setSettings({petVisible:false});updatePet();broadcast();},onQuit:()=>app.quit(),onError:()=>{petError=true;broadcast();}});
     return;
   }
   petWindow = new BrowserWindow({ ...visibleBounds(settings.petPosition, { x: area.x + area.width - 146, y: area.y + area.height - 150, width: 116, height: 132 }), width: 116, height: 132, transparent: true, frame: false, resizable: false, skipTaskbar: true, hasShadow: false, focusable: false, show: false, webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true } });
@@ -259,6 +272,7 @@ ipcMain.handle('planner', async (event, action, data) => {
 ipcMain.on('pet-action', (event, action, data) => {
   if (event.sender !== petWindow?.webContents) return;
   if (action === 'open') openFromPet();
+  if (action === 'toggleSize') toggleMainSizeFromPet();
   if (action === 'menu') tray.popUpContextMenu();
   if (action === 'dragStart') dragOrigin = { cursor: screen.getCursorScreenPoint(), bounds: petWindow.getBounds() };
   if (action === 'drag' && dragOrigin) {

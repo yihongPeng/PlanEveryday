@@ -4,7 +4,7 @@
 
 **下载使用：[最新 Windows 安装版](https://github.com/yihongPeng/PlanEveryday/releases/latest)** · [源码仓库](https://github.com/yihongPeng/PlanEveryday)
 
-下载并运行 `PlanEveryday-Setup-0.5.4.exe`，安装程序会创建桌面入口。当前版本需要 Windows 10/11 x64 和可写的 **D 盘**，数据与缓存固定在 `D:\PlanEverydayData`；无需登录。代码采用 [MIT 许可证](LICENSE)，欢迎下载使用和改进。
+下载并运行 `PlanEveryday-Setup-0.5.5.exe`，安装程序会创建桌面入口。当前版本需要 Windows 10/11 x64 和可写的 **D 盘**，数据与缓存固定在 `D:\PlanEverydayData`；无需登录。代码采用 [MIT 许可证](LICENSE)，欢迎下载使用和改进。
 
 设置 → 启动方式 → **开机自启**：默认关闭；开启后登录 Windows 时只显示桌宠与托盘，不弹计划窗口。设置读取系统实际状态，不随数据备份导入。系统启动项和快捷方式属于 Windows 配置，任务、记背和备份仍在 D 盘。
 
@@ -13,6 +13,7 @@
 - 双击桌面 **芽芽计划** 快捷方式。
 - 或运行 `D:\Programs\PlanEveryday\PlanEveryday.exe`。
 - 首次启动会显示计划小窗和桌宠；右上角 □ 可以最大化，再点击可还原。
+- 0.5.5 起：单击桌宠唤起计划窗口，双击在最大化与原小窗间切换；拖动不触发切换，隐藏或最小化后也可双击唤起并切换大小。
 - 关闭窗口只会收起，桌宠和提醒继续运行。完全退出可用托盘右键或设置页的退出按钮。
 - 安装版入口固定在 D:/Programs/PlanEveryday，更新会自动接管；不要单独移动 exe。
 - 0.2.2 使用原生桌宠。收起约 10 秒后释放计划窗口的渲染进程，再打开恢复本次运行的草稿、筛选与阅读位置；提醒始终在后台调度。

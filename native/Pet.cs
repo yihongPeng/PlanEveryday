@@ -18,6 +18,24 @@ internal static class PetMath {
     }
 }
 
+// Recognize completed clicks without delaying the first click or treating a drag as a double click.
+internal sealed class PetClicks {
+    private bool hasFirst;
+    private Point firstPoint;
+    private uint firstTick;
+    internal void Reset() { hasFirst = false; }
+    internal string Finish(Point down, uint tick, bool dragged, int interval, Size area) {
+        if (dragged) { Reset(); return null; }
+        if (hasFirst && unchecked(tick - firstTick) <= (uint)interval &&
+            Math.Abs((long)down.X - firstPoint.X) * 2 <= area.Width &&
+            Math.Abs((long)down.Y - firstPoint.Y) * 2 <= area.Height) {
+            Reset(); return "toggle-size";
+        }
+        hasFirst = true; firstPoint = down; firstTick = tick;
+        return "open";
+    }
+}
+
 internal static class PetTests {
     internal static void Run() {
         if (PetMath.IsDrag(new Point(10, 10), new Point(16, 10), 1f)) throw new Exception("Six logical pixels is still a click");
@@ -27,16 +45,30 @@ internal static class PetTests {
         Rectangle work = new Rectangle(-1920, 0, 1920, 1040);
         if (PetMath.Clamp(new Point(-2000, 1200), new Size(116,132), work) != new Point(-1920,908)) throw new Exception("Negative monitor boundary");
         if (PetMath.Clamp(new Point(4000, -5), new Size(116,132), new Rectangle(0,0,1920,1040)) != new Point(1804,0)) throw new Exception("Removed monitor recovery");
-        Console.WriteLine("{\"type\":\"self-test\",\"passed\":6}");
+        PetClicks clicks = new PetClicks(); Point p = new Point(100, 100); Size box = new Size(4, 4);
+        if (clicks.Finish(p, 100, false, 500, box) != "open") throw new Exception("Single click opens immediately");
+        if (clicks.Finish(p, 300, false, 500, box) != "toggle-size") throw new Exception("Double click toggles once");
+        if (clicks.Finish(p, 400, false, 500, box) != "open" || clicks.Finish(p, 500, false, 500, box) != "toggle-size") throw new Exception("Four clicks form two pairs");
+        clicks.Finish(p, 600, false, 500, box);
+        if (clicks.Finish(p, 700, true, 500, box) != null || clicks.Finish(p, 800, false, 500, box) != "open") throw new Exception("Drag interrupts the pair");
+        clicks.Reset();
+        if (clicks.Finish(p, 900, false, 500, box) != "open") throw new Exception("Capture loss or right click cancels pair");
+        if (clicks.Finish(p, 1501, false, 500, box) != "open") throw new Exception("Slow clicks do not toggle");
+        if (clicks.Finish(new Point(110, 100), 1600, false, 500, box) != "open") throw new Exception("Distant clicks do not toggle");
+        clicks.Reset(); clicks.Finish(p, uint.MaxValue - 50, false, 500, box);
+        if (clicks.Finish(p, 40, false, 500, box) != "toggle-size") throw new Exception("Tick rollover preserves elapsed time");
+        clicks.Reset(); clicks.Finish(p, 100, false, 900, new Size(8,8));
+        if (clicks.Finish(new Point(103,102), 850, false, 900, new Size(8,8)) != "toggle-size") throw new Exception("Uses configured OS time and click area");
+        Console.WriteLine("{\"type\":\"self-test\",\"passed\":15}");
     }
 }
 internal static class Program {
     internal static uint ParentProcess;
-    internal static void OpenPlanner() {
+    internal static void OpenPlanner(bool toggleSize = false) {
         // The pet receives the user click; explicitly pass foreground permission
         // to Electron before sending the asynchronous open request.
         if (ParentProcess != 0) Native.AllowSetForegroundWindow(ParentProcess);
-        Send("{\"type\":\"open\"}");
+        Send(toggleSize ? "{\"type\":\"toggle-size\"}" : "{\"type\":\"open\"}");
     }
     internal static void Send(string json) {
         try { lock (Console.Out) { Console.WriteLine(json); Console.Out.Flush(); } }
@@ -67,6 +99,8 @@ internal sealed class PetForm : Form {
     private float scale = 1;
     private bool pressed, dragged, closing;
     private Point pressCursor, pressOrigin;
+    private uint pressTick;
+    private readonly PetClicks clicks = new PetClicks();
     private int unread, done = -1;
     private bool celebrating;
     private readonly System.Windows.Forms.Timer celebration = new System.Windows.Forms.Timer();
@@ -82,14 +116,14 @@ internal sealed class PetForm : Form {
         ClientSize = new Size(116, 132);
         TopMost = true;
         Text = "芽芽桌宠";
-        AccessibleName = "芽芽桌宠，点击打开计划，拖动调整位置";
+        AccessibleName = "芽芽桌宠，单击打开计划，双击放大或还原窗口，拖动调整位置";
         Cursor = Cursors.Hand;
         menu.Font = new Font("Microsoft YaHei UI", 10f);
         menu.Items.Add("打开计划", null, delegate { Program.OpenPlanner(); });
         menu.Items.Add("隐藏桌宠", null, delegate { Hide(); Program.Send("{\"type\":\"hide\"}"); });
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("退出应用（退出后不再提醒）", null, delegate { Program.Send("{\"type\":\"quit\"}"); });
-        hint.SetToolTip(this, "点击打开芽芽计划 · 拖动挪位置 · 右键更多");
+        hint.SetToolTip(this, "单击打开计划 · 双击放大／还原 · 拖动挪位置 · 右键更多");
         celebration.Interval = 1600;
         celebration.Tick += delegate { celebration.Stop(); celebrating = false; RenderPet(); };
         SystemEvents.DisplaySettingsChanged += DisplayChanged;
@@ -170,8 +204,8 @@ internal sealed class PetForm : Form {
     }
     protected override void OnMouseDown(MouseEventArgs e) {
         base.OnMouseDown(e);
-        if (e.Button != MouseButtons.Left) return;
-        pressed = true; dragged = false; pressCursor = Cursor.Position; pressOrigin = Location; Capture = true;
+        if (e.Button != MouseButtons.Left) { clicks.Reset(); return; }
+        pressed = true; dragged = false; pressCursor = Cursor.Position; pressOrigin = Location; pressTick = unchecked((uint)Environment.TickCount); Capture = true;
     }
     protected override void OnMouseMove(MouseEventArgs e) {
         base.OnMouseMove(e);
@@ -185,11 +219,12 @@ internal sealed class PetForm : Form {
         if (e.Button == MouseButtons.Right) { menu.Show(Cursor.Position); return; }
         if (e.Button != MouseButtons.Left || !pressed) return;
         bool wasDrag = dragged || PetMath.IsDrag(pressCursor, Cursor.Position, scale);
+        string action = clicks.Finish(pressCursor, pressTick, wasDrag, SystemInformation.DoubleClickTime, SystemInformation.DoubleClickSize);
         pressed = false; Capture = false;
         if (wasDrag) Constrain(true);
-        else Program.OpenPlanner();
+        else Program.OpenPlanner(action == "toggle-size");
     }
-    protected override void OnMouseCaptureChanged(EventArgs e) { base.OnMouseCaptureChanged(e); if (!Capture) pressed = false; }
+    protected override void OnMouseCaptureChanged(EventArgs e) { base.OnMouseCaptureChanged(e); if (!Capture && pressed) { pressed = false; clicks.Reset(); } }
     protected override void OnFormClosed(FormClosedEventArgs e) {
         closing = true;
         SystemEvents.DisplaySettingsChanged -= DisplayChanged;
@@ -205,7 +240,7 @@ internal sealed class PetForm : Form {
     }
     private void RenderPet() {
         if (!IsHandleCreated || closing) return;
-        hint.SetToolTip(this, unread > 0 ? "有 " + unread + " 条提醒 · 点击打开计划" : "点击打开计划 · 拖动调整位置 · 右键更多");
+        hint.SetToolTip(this, (unread > 0 ? "有 " + unread + " 条提醒 · " : "") + "单击打开计划 · 双击放大／还原 · 拖动调整位置 · 右键更多");
         using (Bitmap bitmap = new Bitmap(Width, Height, PixelFormat.Format32bppPArgb)) {
             using (Graphics g = Graphics.FromImage(bitmap)) {
                 g.SmoothingMode = SmoothingMode.AntiAlias;

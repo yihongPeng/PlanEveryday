@@ -12,6 +12,6 @@ if (result.status !== 0) process.exit(result.status || 1);
 const test = spawnSync(output, ['--self-test'], { encoding: 'utf8', windowsHide: true });
 if (test.error) throw test.error;
 if (test.status !== 0) process.exit(test.status || 1);
-if (!test.stdout.includes('"passed":6')) throw new Error('Native pet self-test output was not received.');
+if (!test.stdout.includes('"passed":15')) throw new Error('Native pet self-test output was not received.');
 process.stdout.write(test.stdout);
 console.log('Native pet built: ' + output);
