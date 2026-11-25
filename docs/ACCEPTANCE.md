@@ -18,6 +18,8 @@
 
 最终 ASAR SHA-256：`b2ee27adc0ad4e6e2b4a4d4ccb0f032891a55665b3a419fe3e49d88669d24d93`。证据：`test-results/release-063/`、`stage-direct-unit.log`、五个可复用页面测试报告及构建日志；测试页面使用最终包提取目录。没有启动可见窗口、操作屏幕、替换正式安装或打开正式数据库，用户自行更新。上述检查不代表真实 Windows 升级、多屏、缩放或性能验收。
 
+发布完成：源码提交 `06d583d00a99961fad8e826ea52b1e5db5704ed9` 与 tag `v0.6.3` 已推送。[GitHub Release 0.6.3](https://github.com/yihongPeng/PlanEveryday/releases/tag/v0.6.3) 的三件附件在大小、SHA-256 一致后公开并设为 latest，再次核对非草稿。匿名 latest 返回 0.6.3；完整下载 121,700,352 字节安装包的 SHA-512、元数据和 blockmap 与本地一致，README 三图仍可公开访问。证据位于 `test-results/release-063/github-assets.json` 和 `public-download-check.json`。本轮两份一次性源码/测试改写脚本已清理，保留可重复测试与证据；没有新增临时验收程序或桌面入口，也未清理上轮被拒绝的历史缓存。
+
 ## 2026-11-25 · 0.6.2 阶段箭头与无文字时间条
 
 用户截图指出阶段旁的字符箭头不好看，并要求右侧任务色块不显示重复文字。本轮将字符换为居中 14px 的细线 SVG，展开向下、收起向右；移除任务条内标题及完成符号，左侧名称与完成状态、悬停提示、按钮可访问名称、拖动/两端手柄保持。拖动中的日期反馈为临时操作反馈，仍保留。
