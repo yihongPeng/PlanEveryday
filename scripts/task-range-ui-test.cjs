@@ -10,14 +10,14 @@ const overdue=store.addTask({title:'已经结束的安排',plannedDate:date(-4),
 const future=store.addTask({title:'下周练习',plannedDate:date(1),plannedEndDate:date(3)});
 const inbox=store.addTask({title:'尚未安排'});
 const project=store.addProject({title:'日期边界'}),stage=store.addStage({projectId:project.id,title:'一个阶段',startDate:date(-1),endDate:date(1)});
-const actions={snapshot:()=>({...store.snapshot(),version:'0.5.5',session}),'session:restored':()=>session=null,update:x=>store.updateTask(x.id,x.patch),schedule:x=>store.scheduleTasks(x.ids,x.date),undoSchedule:x=>store.undoSchedule(x),focus:x=>store.toggleFocus(x.id,x.replaceId),confirmDiscard:()=>true,previewStageSchedule:x=>store.previewStageSchedule(x),applyStageSchedule:x=>store.applyStageSchedule(x),readEvents:()=>store.markRead()};
+const actions={snapshot:()=>({...store.snapshot(),version:'0.5.5',session}),'session:restored':()=>session=null,update:x=>store.updateTask(x.id,x.patch),schedule:x=>store.scheduleTasks(x.ids,x.date),undoSchedule:x=>store.undoSchedule(x),focus:x=>store.toggleFocus(x.id,x.replaceId),confirmDiscard:()=>true,scheduleStageRange:x=>store.scheduleStageRange(x),readEvents:()=>store.markRead()};
 const task=id=>store.snapshot().tasks.find(t=>t.id===id);
 async function tick(){await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));}
 async function nav(view){await page.locator(`[data-view="${view}"]:visible`).first().click();await tick();}
 async function open(width=460,height=680){
  page=await browser.newPage({viewport:{width,height}});page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(/^https?:/.test(r.url()))network.push(r.url());});
  await page.exposeFunction('testInvoke',async(a,d)=>{try{assert(actions[a],`Unexpected ${a}`);if(failNext&&a==='update'){failNext=false;throw Error('模拟写入失败');}return {ok:true,data:await actions[a](d)};}catch(e){return {ok:false,error:e.message};}});
- await page.addInitScript(()=>{let changed;window.planner={async invoke(a,d){const result=await window.testInvoke(a,d);if(result.ok&&!['snapshot','session:restored','previewStageSchedule','confirmDiscard'].includes(a))queueMicrotask(()=>changed?.());return result;},onChange(fn){changed=fn;},onUpdate(){},onOpenTask(){}};});
+ await page.addInitScript(()=>{let changed;window.planner={async invoke(a,d){const result=await window.testInvoke(a,d);if(result.ok&&!['snapshot','session:restored','confirmDiscard'].includes(a))queueMicrotask(()=>changed?.());return result;},onChange(fn){changed=fn;},onUpdate(){},onOpenTask(){}};});
  await page.goto(pathToFileURL(path.join(process.env.PLANEVERYDAY_UI_ROOT||root,'src/ui/index.html')).href);await page.waitForFunction(()=>!!document.body.dataset.page);await tick();
 }
 async function saveDetail(){await page.locator('#detail [type=submit]').click();await page.waitForFunction(()=>document.querySelector('#toast').textContent.includes('修改已保存'));await tick();}

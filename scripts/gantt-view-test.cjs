@@ -37,7 +37,7 @@ async function render(input = {}) {
     window.mountGantt = () => window.ProjectGantt.render({ container: document.querySelector('#test-root'),
       ...window.data, session: window.session,
       onTask: id => calls.tasks.push(id), onStage: id => calls.stages.push(id),
-      onSchedule: proposal => calls.schedule.push(proposal), onSessionChange: () => calls.session++,
+      onSchedule: async proposal => {calls.schedule.push(proposal);if(window.failSave)throw Error('模拟阶段写入失败');}, onSessionChange: () => calls.session++,
       onTaskSchedule: async proposal => {
         calls.taskSchedule.push(proposal); calls.cleanDuringSave.push(!session.taskDraft);
         if (window.failSave) throw new Error('模拟写入失败');
@@ -58,6 +58,7 @@ async function drag(selector, delta, finish = 'release') {
   const x = rect.x + Math.min(rect.width / 2, 35), y = rect.y + rect.height / 2;
   assert(await control.evaluate((el,{x,y})=>el.contains(document.elementFromPoint(x,y)),{x,y}),'drag handle must receive pointer hit');
   await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.move(x + delta, y, { steps: 4 });
+  assert.equal(await page.locator('.gantt-drag-range').count(),0,'Dragging must never overlay a date range on a bar');
   assert.equal(await page.evaluate(() => calls.schedule.length + calls.taskSchedule.length), 0, 'pointer motion must not submit');
   if (finish === 'escape') await page.keyboard.press('Escape');
   if (finish === 'cancel') await control.dispatchEvent('pointercancel');
@@ -177,13 +178,13 @@ async function formRange(start, end) {
     assert.equal(await page.evaluate(() => calls.taskSchedule[0].expected.updatedAt), 'newer');
     checks.push('explicit restore-saved action discards a stale candidate and uses the latest date conflict token for the next save');
 
-    await render(); await drag('[data-stage-bar=s1] .gantt-bar-move', 96);
-    assert.deepEqual(await page.evaluate(() => calls.schedule), [{ id: 's1', startDate: '2026-11-25', endDate: '2026-12-01' }]);
-    assert.equal(await page.evaluate(() => data.stages[0].startDate), '2026-11-23');
-    assert.deepEqual(await page.evaluate(() => calls.stages), []);
-    await render(); await drag('[data-stage-bar=s1] .gantt-bar-start', 48);
-    assert.deepEqual(await page.evaluate(() => calls.schedule), [{ id: 's1', startDate: '2026-11-24', endDate: '2026-11-29' }]);
-    checks.push('phase body and start handle retain explicit impact-preview callback without mutation or accidental editor click');
+    for (const [mode,delta,start,end] of [['move',96,'2026-11-25','2026-12-01'],['start',48,'2026-11-24','2026-11-29'],['end',48,'2026-11-23','2026-11-30']]) {
+      await render(); await drag('[data-stage-bar=s1] .gantt-bar-'+mode,delta);
+      const calls=await page.evaluate(()=>window.calls);assert.equal(calls.schedule.length,1);assert.equal(calls.schedule[0].startDate,start);assert.equal(calls.schedule[0].endDate,end);assert.equal(calls.schedule[0].expected.startDate,'2026-11-23');assert.deepEqual(calls.stages,[]);assert.equal(await page.evaluate(()=>data.stages[0].startDate),start);
+    }
+    await render();await page.evaluate(()=>window.failSave=true);await drag('[data-stage-bar=s1] .gantt-bar-move',96);assert.equal(await page.evaluate(()=>data.stages[0].startDate),'2026-11-23');assert.match(await page.locator('.gantt-feedback').textContent(),/模拟阶段写入失败/);assert.match(await page.locator('[data-stage-bar=s1]').getAttribute('title'),/2026-11-23—2026-11-29/);
+    await render();await page.locator('[data-stage-bar=s1] .gantt-bar-end').focus();await page.keyboard.press('ArrowRight');await tick();assert.equal(await page.evaluate(()=>data.stages[0].endDate),'2026-11-30');assert.equal(await page.evaluate(()=>document.activeElement.dataset.edge),'end');
+    checks.push('phase body and both edges save directly, restore saved bar on failure and retain keyboard focus; no drag date overlay');
 
     await page.setViewportSize({ width: 760, height: 600 }); await render();
     const edgeControl = page.locator('[data-task-bar=t1] .gantt-bar-move'); await edgeControl.scrollIntoViewIfNeeded();

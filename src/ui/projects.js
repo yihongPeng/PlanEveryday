@@ -3,7 +3,7 @@
  'use strict';
  const storageKey = 'planner.projects.view.v1';
  const empty = () => ({ id:null, query:'', groups:{}, projects:{}, drafts:{}, dialog:null, selection:[], listScroll:0 });
- let model=empty(), context=null, busy=false, cleanupGantt=()=>{}, listeners=null, previewTicket=0;
+ let model=empty(), context=null, busy=false, cleanupGantt=()=>{}, listeners=null;
  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const dateText=v=>v?`${+v.slice(5,7)}月${+v.slice(8,10)}日`:'未安排';
  const dateRange=(start,end=start)=>!start?'未安排日期':start===end?dateText(start):start.slice(0,4)!==end.slice(0,4)?`${start.slice(0,4)}年${dateText(start)}—${end.slice(0,4)}年${dateText(end)}`:`${dateText(start)}—${dateText(end)}`;
@@ -70,8 +70,8 @@
    const moving=d.kind==='move',query=(d.query||'').trim().toLocaleLowerCase(),available=tasks().filter(t=>t.projectId!==model.id).filter(t=>(t.title+' '+(project(t.projectId)?.title||'')).toLocaleLowerCase().includes(query));
    body=`${dialogHead(moving?'归入阶段':'归入已有任务')}<form id="project-assignment-form"><label class="project-field" for="project-assign-stage">归入阶段<select id="project-assign-stage" name="stageId">${stageOptions(d.stageId||'')}</select></label>${moving?`<p class="project-help">已选择 ${d.ids.length} 项任务；日期、提醒与完成状态保持不变。</p>`:`<label class="project-field" for="project-assign-query">查找任务<input id="project-assign-query" type="search" value="${esc(d.query||'')}" placeholder="搜索任务或原项目"></label><div class="project-assign-list">${available.length?available.map(t=>`<label class="project-assign-option"><input type="checkbox" data-project-assign-select="${esc(t.id)}" ${d.ids.includes(t.id)?'checked':''}><span><strong>${esc(t.title)}</strong><small>${t.status==='done'?'已完成 · ':''}${t.plannedDate?dateRange(t.plannedDate,taskEnd(t)):'未安排'} · ${esc(project(t.projectId)?.title||'未归项目')}</small></span></label>`).join(''):'<p class="project-help">没有可归入的任务。</p>'}</div><p class="project-help">已选择 ${d.ids.length} 项。任务原地归入；日期、提醒与完成状态保持不变。</p>`}${dialogError()}${dialogFooter('归入项目'+(moving?'阶段':''))}</form>`;
   }else if(d.kind==='schedule'){
-   const item=stage(d.id),p=d.preview,affected=p?.tasks||[];
-   body=`${dialogHead('调整阶段日期')}<p class="project-dialog-context">${esc(item?.title||'阶段')}</p><form id="project-schedule-form"><div class="project-date-fields"><label class="project-field" for="project-schedule-start">开始日<input id="project-schedule-start" type="date" name="startDate" value="${esc(d.startDate||'')}"></label><label class="project-field" for="project-schedule-end">结束日<input id="project-schedule-end" type="date" name="endDate" value="${esc(d.endDate||'')}"></label></div><button type="button" class="project-subtle" data-stage-unschedule>清除阶段日期</button><label class="project-shift-choice"><input id="project-shift-tasks" type="checkbox" ${d.shiftTasks?'checked':''} ${!item?.startDate||!d.startDate?'disabled':''}><span>同时平移该阶段未完成任务<small>只移动已有安排日期的未完成任务</small></span></label><div class="project-schedule-preview" aria-live="polite">${p?`<p>${dateRange(p.before.startDate,p.before.endDate)} <span aria-hidden="true">→</span> ${dateRange(p.startDate,p.endDate)}</p><p>${d.shiftTasks?`将移动 ${affected.length} 项任务，其中 ${affected.filter(t=>t.reminderAt).length} 项有提醒`:'只调整阶段时间，任务日期保持不变'}</p>${affected.length?`<ol>${affected.map(t=>`<li><strong>${esc(t.title)}</strong><span>${dateRange(t.from,t.fromEnd||t.from)} → ${dateRange(t.to,t.toEnd||t.to)}</span>${t.reminderAt?`<small>提醒保持：${esc(new Date(t.reminderAt).toLocaleString('zh-CN',{hour12:false}))}</small>`:''}${losesFocus(t.focusDate,t.to,t.toEnd)?'<small>将清除原重点</small>':''}</li>`).join('')}</ol>`:''}`:'<p>选择日期后查看改期预览。</p>'}</div><p class="project-help">提醒时间不会自动移动。已完成与未安排的任务保持原状。</p><button type="button" class="project-subtle" data-project-refresh-preview>刷新改期预览</button>${dialogError()}${dialogFooter(p?'确认调整':'查看改期预览')}</form>`;
+   const item=stage(d.id);if(item&&!d.expected)d.expected=stageExpected(item);
+   body=`${dialogHead('调整阶段日期')}<p class="project-dialog-context">${esc(item?.title||'阶段')}</p><form id="project-schedule-form"><div class="project-date-fields"><label class="project-field" for="project-schedule-start">开始日<input id="project-schedule-start" type="date" name="startDate" value="${esc(d.startDate||'')}"></label><label class="project-field" for="project-schedule-end">结束日<input id="project-schedule-end" type="date" name="endDate" value="${esc(d.endDate||'')}"></label></div><button type="button" class="project-subtle" data-stage-unschedule>清除阶段日期</button><p class="project-help">只调整阶段日期，任务单独安排。</p>${dialogError()}${dialogFooter('保存日期')}</form>`;
   }
   return `<dialog id="project-dialog" class="project-dialog" data-kind="${esc(d.kind)}" aria-labelledby="project-dialog-title">${body}</dialog>`;
  }
@@ -86,7 +86,7 @@
   const scroller=container.querySelector('.project-scroll');if(scroller)scroller.scrollTop=model.id?(session().scroll||0):model.listScroll;
   if(model.id&&session().tab==='gantt'){
    const gantt=window.ProjectGantt,host=container.querySelector('.project-gantt-host');
-   if(gantt)cleanupGantt=gantt.render({container:host,toolbarContainer:container.querySelector('.project-gantt-controls'),project:project(),stages:projectStages(),tasks:projectTasks(),session:session().gantt||(session().gantt={}),onTask:id=>context.openTask(typeof id==='string'?id:id.id),onStage:id=>openEditor('stage',typeof id==='string'?id:id.id),onSchedule:openSchedule,onTaskSchedule:saveTaskRange,onSessionChange:persist})||(()=>{});
+   if(gantt)cleanupGantt=gantt.render({container:host,toolbarContainer:container.querySelector('.project-gantt-controls'),project:project(),stages:projectStages(),tasks:projectTasks(),session:session().gantt||(session().gantt={}),onTask:id=>context.openTask(typeof id==='string'?id:id.id),onStage:id=>openEditor('stage',typeof id==='string'?id:id.id),onSchedule:saveStageRange,onTaskSchedule:saveTaskRange,onSessionChange:persist})||(()=>{});
    else host.innerHTML='<p class="project-help">甘特图暂时不可用，可通过阶段日期继续安排。</p>';
   }
   const dialog=container.querySelector('#project-dialog');if(dialog){dialog.showModal();dialog.addEventListener('cancel',e=>{e.preventDefault();if(!busy)closeDialog();},{signal:listeners?.signal});}
@@ -95,7 +95,7 @@
   persist();
  }
  function openEditor(kind,id=null){model.dialog={kind,id};draft(kind,id);draw();focus('project-title');}
- function closeDialog(){previewTicket++;model.dialog=null;draw();}
+ function closeDialog(){model.dialog=null;draw();}
  function confirmAction(title,message,action,label='确认',danger=false){model.dialog={kind:'confirm',title,message,action,label,danger,returnTo:model.dialog};draw();}
  function report(error){const message=error?.message||String(error);const target=context.container.querySelector('.project-dialog-error')||context.container.querySelector('.project-error');if(target)target.textContent=message;else context.toast(message);}
  async function act(fn){if(busy)return;busy=true;context.container.setAttribute('aria-busy','true');context.container.querySelectorAll('[data-project-dialog-save],[data-project-add-task],[data-project-confirm]').forEach(x=>x.disabled=true);try{await fn();}catch(error){report(error);}finally{busy=false;context.container.removeAttribute('aria-busy');context.container.querySelectorAll('[data-project-dialog-save],[data-project-add-task],[data-project-confirm]').forEach(x=>x.disabled=false);}}
@@ -121,22 +121,22 @@
   if(project().status==='completed'&&!reopen&&assignment.ids.some(id=>tasks().find(t=>t.id===id)?.status==='todo')){confirmAction('重新打开项目并继续','归入待办会将这个已完成的项目恢复为进行中。',{kind:'assign',assignment},'重新打开并归入');return;}
   await context.api('assignTasks',{ids:assignment.ids,projectId:model.id,stageId:assignment.stageId||null,...(reopen?{reopenProject:true}:{})});model.dialog=null;model.selection=[];await refresh();context.toast('任务已归入，日期和提醒保持不变');
  }
+ const stageExpected=item=>({startDate:item.startDate,endDate:item.endDate,updatedAt:item.updatedAt});
  function openSchedule(proposal){
   const item=stage(proposal.id);if(!item)return;
-  model.dialog={kind:'schedule',id:item.id,startDate:proposal.startDate===undefined?item.startDate:proposal.startDate,endDate:proposal.endDate===undefined?item.endDate:proposal.endDate,shiftTasks:false,preview:null};draw();void loadPreview();
+  model.dialog={kind:'schedule',id:item.id,startDate:item.startDate,endDate:item.endDate,expected:stageExpected(item)};draw();
  }
- async function loadPreview(){
-  const d=model.dialog;if(d?.kind!=='schedule')return;const ticket=++previewTicket;
-  d.preview=null;persist();
-  try{const result=await context.api('previewStageSchedule',{id:d.id,startDate:d.startDate||null,endDate:d.endDate||null,shiftTasks:!!d.shiftTasks});if(model.dialog===d&&ticket===previewTicket){d.preview=result;draw();}}
-  catch(error){if(model.dialog===d&&ticket===previewTicket){draw();report(error);}}
+ async function commitStageRange(proposal,close=false){
+  const undo=await context.api('scheduleStageRange',proposal);
+  if(close)model.dialog=null;
+  await refresh();context.toast('阶段日期已调整',async()=>{try{await context.api('undoStageSchedule',undo);await refresh();context.toast('已撤销阶段改期');}catch(error){context.toast(error.message);}});
  }
  async function saveSchedule(){
-  const d=model.dialog;if(!d.preview){await loadPreview();return;}
-  let undo;
-  try{undo=await context.api('applyStageSchedule',d.preview);}
-  catch(error){if(model.dialog===d){d.preview=null;draw();}throw error;}
-  model.dialog=null;await refresh();context.toast('阶段日期已调整',async()=>{try{const result=await context.api('undoStageSchedule',undo);await refresh();context.toast(result?.focusSkipped?.length?'已恢复日期；当前重点名额保持不变':'已撤销阶段改期');}catch(error){context.toast(error.message);}});
+  const d=model.dialog;await commitStageRange({id:d.id,startDate:d.startDate||null,endDate:d.endDate||null,expected:d.expected},true);
+ }
+ async function saveStageRange(proposal){
+  if(busy)throw Error('正在保存，请稍后重试');busy=true;
+  try{await commitStageRange(proposal);}catch(error){context.toast(error.message);throw error;}finally{busy=false;}
  }
  async function saveTaskRange(proposal){
   if(busy)throw Error('正在保存，请稍后重试');
@@ -193,8 +193,7 @@
   else if('projectSelectionClear'in data){model.selection=[];draw();}
   else if('projectMulti'in data){session().multi=!session().multi;if(!session().multi)model.selection=[];draw();}
   else if('projectFilterClear'in data){Object.assign(session(),{query:'',status:'all',priority:'all'});draw();}
-  else if('stageUnschedule'in data){Object.assign(model.dialog,{startDate:null,endDate:null,shiftTasks:false,preview:null});draw();void loadPreview();}
-  else if('projectRefreshPreview'in data)void act(loadPreview);
+  else if('stageUnschedule'in data){Object.assign(model.dialog,{startDate:null,endDate:null});draw();}
  }
  function input(e){
   const el=e.target,id=el.id;
@@ -211,8 +210,8 @@
   else if('projectSelect'in el.dataset){const set=new Set(model.selection);el.checked?set.add(el.dataset.projectSelect):set.delete(el.dataset.projectSelect);model.selection=[...set];draw();}
   else if('projectAssignSelect'in el.dataset){const set=new Set(model.dialog.ids);el.checked?set.add(el.dataset.projectAssignSelect):set.delete(el.dataset.projectAssignSelect);model.dialog.ids=[...set];draw();}
   else if(id==='project-assign-stage'){model.dialog.stageId=el.value;persist();}
-  else if(['project-schedule-start','project-schedule-end','project-shift-tasks'].includes(id)){
-   const d=model.dialog;if(d?.kind!=='schedule')return;if(id==='project-shift-tasks')d.shiftTasks=el.checked;else d[id.endsWith('start')?'startDate':'endDate']=el.value||null;if(!d.startDate)d.shiftTasks=false;d.preview=null;persist();void loadPreview();
+  else if(['project-schedule-start','project-schedule-end'].includes(id)){
+   const d=model.dialog;if(d?.kind!=='schedule')return;d[id.endsWith('start')?'startDate':'endDate']=el.value||null;persist();
   }
  }
  function submit(e){

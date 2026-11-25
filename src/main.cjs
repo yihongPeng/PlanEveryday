@@ -231,8 +231,7 @@ const actions = {
   updateStage: ({id,patch}) => store.updateStage(id,patch),
   deleteStage: ({id}) => store.deleteStage(id),
   assignTasks: ({ids,...assignment}) => store.assignTasks(ids,assignment),
-  previewStageSchedule: data => store.previewStageSchedule(data),
-  applyStageSchedule: data => store.applyStageSchedule(data),
+  scheduleStageRange: data => store.scheduleStageRange(data),
   undoStageSchedule: data => store.undoStageSchedule(data),
   scheduleTaskRange: data => store.scheduleTaskRange(data),
   undoTaskRange: data => store.undoTaskRange(data),
@@ -278,7 +277,7 @@ ipcMain.handle('planner', async (event, action, data) => {
   if (event.sender === petWindow?.webContents && action !== 'snapshot') return { ok: false, error: '无权执行' };
   if(updates?.snapshot().phase==='installing'&&!['snapshot','session:restored'].includes(action))return {ok:false,error:'正在准备更新，请稍候。'};
   if (!Object.hasOwn(actions, action)) return { ok: false, error: '不支持的操作' };
-  try { const result = await actions[action](data); if (!['snapshot','previewStageSchedule'].includes(action)&&!action.startsWith('update:')) broadcast(); return { ok: true, data: result }; }
+  try { const result = await actions[action](data); if (action!=='snapshot'&&!action.startsWith('update:')) broadcast(); return { ok: true, data: result }; }
   catch (error) { return { ok: false, error: error.message || '操作失败，请重试。' }; }
 });
 ipcMain.on('pet-action', (event, action, data) => {

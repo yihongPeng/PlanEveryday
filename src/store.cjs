@@ -153,7 +153,7 @@ class Store{
  pollReminders(now=Date.now(),{silent=false}={}){ensure(Number.isFinite(now),'提醒检查时间无效');if(!this.state.tasks.some(t=>t.status==='todo'&&t.reminderAt&&Date.parse(t.reminderAt)<=now&&t.remindedRevision<t.reminderRevision))return [];return this.mutate(s=>this.consume(s,now));}
  markRead(ids=null){if(ids!==null)ensure(Array.isArray(ids)&&ids.every(uuid),'提醒标识无效');return this.mutate(s=>{const now=new Date().toISOString();for(const e of s.events)if(!e.readAt&&(ids===null||ids.includes(e.id)))e.readAt=now;});}
  exportBackup(){return stateBackup(this.state);}
- restoreBackup(input){const backup=validateBackup(input);const result=this.mutate(s=>{s.tasks=backup.tasks;s.events=backup.events;s.knowledge=backup.knowledge;s.projects=backup.projects;s.stages=backup.stages;for(const key of Object.keys(defaults))s.settings[key]=backup.settings[key]??defaults[key];this.consume(s,Date.now());});this._stagePreviews.clear();this._stageUndos.clear();this._taskRangeUndos.clear();this._scheduleEpoch=randomUUID();return result;}
+ restoreBackup(input){const backup=validateBackup(input);const result=this.mutate(s=>{s.tasks=backup.tasks;s.events=backup.events;s.knowledge=backup.knowledge;s.projects=backup.projects;s.stages=backup.stages;for(const key of Object.keys(defaults))s.settings[key]=backup.settings[key]??defaults[key];this.consume(s,Date.now());});this._stageUndos.clear();this._taskRangeUndos.clear();this._scheduleEpoch=randomUUID();return result;}
  close(){this.db.close();}
 }
 Object.assign(Store.prototype,projectMethods);

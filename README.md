@@ -4,7 +4,7 @@
 
 **下载使用：[最新 Windows 安装版](https://github.com/yihongPeng/PlanEveryday/releases/latest)** · [源码仓库](https://github.com/yihongPeng/PlanEveryday)
 
-下载并运行 `PlanEveryday-Setup-0.6.2.exe`，安装程序会创建桌面入口。当前版本需要 Windows 10/11 x64 和可写的 **D 盘**，数据与缓存固定在 `D:\PlanEverydayData`；无需登录。代码采用 [MIT 许可证](LICENSE)，欢迎下载使用和改进。
+下载并运行 `PlanEveryday-Setup-0.6.3.exe`，安装程序会创建桌面入口。当前版本需要 Windows 10/11 x64 和可写的 **D 盘**，数据与缓存固定在 `D:\PlanEverydayData`；无需登录。代码采用 [MIT 许可证](LICENSE)，欢迎下载使用和改进。
 
 ## 界面预览
 
@@ -66,7 +66,7 @@
 
 多日任务在跨度内每天显示，完成一次后移出所有日期的待办；结束日之后才进入待重新安排。快捷“今天开始／明天开始”保留原天数，清除日期则回到收集箱。今日重点仍最多 3 项，提醒仍只有一个，不因跨天或改期重复。底部与侧栏使用同套本地 Lucide 线条图标，无联网请求；授权保存在 `src/ui/vendor/lucide-LICENSE` 和 `lucide-NOTICE`。
 
-拖动阶段或编辑阶段日期时先查看改期预览，默认只改阶段；主动选择时才平移已有日期的未完成任务，提醒不变，支持整批撤销。归档项目保留全局任务与提醒，删除项目/阶段保留任务并解除相应归属。
+拖动阶段条或两端后直接保存日期，无需弹窗确认；手动编辑日期也只需保存一次。阶段和任务各自安排，不再联动平移任务；阶段改期支持撤销。拖动过程中色块不显示日期范围文字。归档项目保留全局任务与提醒，删除项目/阶段保留任务并解除相应归属。
 
 甘特图采用“清晰工具感”：白色主面、轻网格、实色苔绿任务条，今天只在表头提示。SQLite 格式 3、备份 v6，旧单日任务自动补齐结束日；迁移前备份任务、项目、记背与引用图片，继续支持 v1–v5 备份恢复。后台检查可运行 `node scripts/project-gantt-test.cjs`、`node scripts/project-workspace-test.cjs`、`node scripts/gantt-view-test.cjs` 和 `node scripts/task-range-ui-test.cjs`；它们不操作桌面窗口。开发测试目录固定在 D 盘 `test-results`。
 

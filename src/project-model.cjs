@@ -1,5 +1,5 @@
 'use strict';
-const {randomUUID,createHash}=require('node:crypto');
+const {randomUUID}=require('node:crypto');
 const uuid=value=>typeof value==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(value);
 function ensure(condition,message){if(!condition)throw Error(message);}
 function date(value){return typeof value==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(value)&&value>='0001-01-01'&&value<='9999-12-31'&&Number.isFinite(Date.parse(value))&&new Date(value).toISOString().slice(0,10)===value;}
@@ -33,36 +33,33 @@ function shiftDate(value,days){const ordinal=dayNumber(value)+days;ensure(date(v
 function containsDate(start,end,value){return !!(start&&end&&value&&start<=value&&value<=end);}
 // Expected-state checks must distinguish edits even in one clock tick or after a clock rollback.
 function taskTimestamp(task){return new Date(Math.max(Date.now(),Date.parse(task.updatedAt)+1)).toISOString();}
-function digest(value){return createHash('sha256').update(JSON.stringify(value)).digest('hex');}
-function initializeGuards(store){store._stagePreviews=new Map();store._stageUndos=new Map();store._taskRangeUndos=new Map();store._scheduleEpoch=randomUUID();store._taskVersions=new Map();store._taskFocusVersions=new Map();store._stageVersions=new Map();store._taskScheduleVersions=new Map();store._stageScheduleVersions=new Map();}
+function initializeGuards(store){store._stageUndos=new Map();store._taskRangeUndos=new Map();store._scheduleEpoch=randomUUID();store._taskVersions=new Map();store._taskFocusVersions=new Map();store._stageVersions=new Map();store._taskScheduleVersions=new Map();store._stageScheduleVersions=new Map();}
 function trackRevisions(store,previous,next){
  for(const [field,versions,schedules,keys] of [['tasks',store._taskVersions,store._taskScheduleVersions,['plannedDate','plannedEndDate','projectId','stageId','status']],['stages',store._stageVersions,store._stageScheduleVersions,['startDate','endDate','projectId']]]){
   const old=new Map(previous[field].map(item=>[item.id,item])),now=new Map(next[field].map(item=>[item.id,item]));for(const id of new Set([...old.keys(),...now.keys()])){const a=old.get(id),b=now.get(id);if(field==='tasks'&&(!a||!b||a.focusDate!==b.focusDate))store._taskFocusVersions.set(id,(store._taskFocusVersions.get(id)||0)+1);if(JSON.stringify(a)!==JSON.stringify(b))versions.set(id,(versions.get(id)||0)+1);if(!a||!b||keys.some(key=>a[key]!==b[key]))schedules.set(id,(schedules.get(id)||0)+1);}
  }
 }
 function remember(map,token,value){map.set(token,value);while(map.size>64)map.delete(map.keys().next().value);}
-function previewFingerprint(store,id){const stage=stageAt(store.state,id),project=projectAt(store.state,stage.projectId);return digest({stage,stageVersion:store._stageVersions.get(id)||0,project,tasks:store.state.tasks.filter(t=>t.stageId===id).map(t=>[t,store._taskVersions.get(t.id)||0])});}
 const projectMethods={
  addProject(input){return this.mutate(s=>{fields(input,['title','outcome','targetDate','status','archivedAt'],'项目内容格式不正确');const now=new Date().toISOString(),p={id:randomUUID(),title:typeof input.title==='string'?input.title.trim():input.title,outcome:input.outcome===undefined?'':input.outcome,targetDate:input.targetDate??null,status:input.status===undefined?'active':input.status,archivedAt:input.archivedAt??null,createdAt:now,updatedAt:now};projectValid(p);ensure(p.status==='active','项目尚无任务，不能标为完成');s.projects.push(p);return p;});},
  updateProject(id,patch){return this.mutate(s=>{fields(patch,['title','outcome','targetDate','status','archivedAt'],'不支持修改此项目字段');const p=projectAt(s,id);for(const key of Object.keys(patch))p[key]=key==='title'&&typeof patch[key]==='string'?patch[key].trim():patch[key];if(p.status==='completed'){const tasks=s.tasks.filter(t=>t.projectId===id);ensure(tasks.length>0,'项目尚无任务，不能标为完成');ensure(tasks.every(t=>t.status==='done'),'项目仍有待办，请先处理待办或归档项目');}p.updatedAt=new Date().toISOString();return p;});},
  deleteProject(id){return this.mutate(s=>{projectAt(s,id);s.projects=s.projects.filter(p=>p.id!==id);s.stages=s.stages.filter(stage=>stage.projectId!==id);const now=new Date().toISOString();for(const task of s.tasks)if(task.projectId===id){task.projectId=null;task.stageId=null;task.updatedAt=taskTimestamp(task);}});},
  addStage(input){return this.mutate(s=>{fields(input,['projectId','title','outcome','startDate','endDate','order'],'阶段内容格式不正确');projectAt(s,input.projectId);const now=new Date().toISOString(),existing=s.stages.filter(stage=>stage.projectId===input.projectId),stage={id:randomUUID(),projectId:input.projectId,title:typeof input.title==='string'?input.title.trim():input.title,outcome:input.outcome===undefined?'':input.outcome,startDate:input.startDate??null,endDate:input.endDate??null,order:input.order===undefined?(existing.length?Math.max(...existing.map(stage=>stage.order))+1:0):input.order,createdAt:now,updatedAt:now};stageValid(stage);s.stages.push(stage);return stage;});},
- updateStage(id,patch){return this.mutate(s=>{fields(patch,['title','outcome','startDate','endDate','order'],'不支持修改此阶段字段');const stage=stageAt(s,id);for(const key of Object.keys(patch))stage[key]=key==='title'&&typeof patch[key]==='string'?patch[key].trim():patch[key];stage.updatedAt=new Date().toISOString();return stage;});},
+ updateStage(id,patch){return this.mutate(s=>{fields(patch,['title','outcome','startDate','endDate','order'],'不支持修改此阶段字段');const stage=stageAt(s,id);for(const key of Object.keys(patch))stage[key]=key==='title'&&typeof patch[key]==='string'?patch[key].trim():patch[key];stage.updatedAt=taskTimestamp(stage);return stage;});},
  deleteStage(id){return this.mutate(s=>{stageAt(s,id);s.stages=s.stages.filter(stage=>stage.id!==id);for(const task of s.tasks)if(task.stageId===id){task.stageId=null;task.updatedAt=taskTimestamp(task);}});},
  assignTasks(ids,input){return this.mutate(s=>{ensure(Array.isArray(ids)&&ids.length>0,'请选择要归入项目的任务');fields(input,['projectId','stageId','reopenProject'],'任务归属格式不正确');ensure(Object.hasOwn(input,'projectId'),'请选择项目或未归项目');return [...new Set(ids)].map(id=>{const task=this.get(s,id);association(s,task,input);task.updatedAt=taskTimestamp(task);return task;});});},
- previewStageSchedule(input){
-  fields(input,['id','startDate','endDate','shiftTasks'],'阶段改期格式不正确');const stage=stageAt(this.state,input.id),{startDate,endDate}=input,shiftTasks=input.shiftTasks===undefined?false:input.shiftTasks;range(startDate,endDate);ensure(typeof shiftTasks==='boolean','请选择是否同时平移任务');if(shiftTasks)ensure(stage.startDate&&startDate,'阶段需要原开始日和新开始日，才能同时平移任务');const deltaDays=stage.startDate&&startDate?dayNumber(startDate)-dayNumber(stage.startDate):0;
-  const tasks=shiftTasks&&deltaDays!==0?this.state.tasks.filter(t=>t.stageId===stage.id&&t.status==='todo'&&t.plannedDate).map(t=>({id:t.id,title:t.title,from:t.plannedDate,fromEnd:t.plannedEndDate,to:shiftDate(t.plannedDate,deltaDays),toEnd:shiftDate(t.plannedEndDate,deltaDays),reminderAt:t.reminderAt,focusDate:t.focusDate})):[];
-  const preview={id:stage.id,startDate,endDate,shiftTasks,deltaDays,before:{startDate:stage.startDate,endDate:stage.endDate},tasks,token:randomUUID()};remember(this._stagePreviews,preview.token,{preview:structuredClone(preview),fingerprint:previewFingerprint(this,stage.id)});return preview;
- },
- applyStageSchedule(preview){
-  object(preview,'改期预览无效，请重新预览');const pending=this._stagePreviews.get(preview.token);ensure(pending&&digest(pending.preview)===digest(preview),'改期预览已失效，请重新预览');ensure(pending.fingerprint===previewFingerprint(this,preview.id),'阶段或任务已有变化，请重新预览后确认');
-  const undoToken=randomUUID();this.mutate(s=>{const stage=stageAt(s,preview.id),now=new Date().toISOString();stage.startDate=preview.startDate;stage.endDate=preview.endDate;stage.updatedAt=now;for(const item of preview.tasks){const task=this.get(s,item.id);task.plannedDate=item.to;task.plannedEndDate=item.toEnd;if(!containsDate(item.to,item.toEnd,task.focusDate))task.focusDate=null;task.updatedAt=taskTimestamp(task);}});
-  this._stagePreviews.delete(preview.token);remember(this._stageUndos,undoToken,{preview:structuredClone(preview),stageVersion:this._stageScheduleVersions.get(preview.id)||0,taskVersions:preview.tasks.map(item=>[item.id,this._taskScheduleVersions.get(item.id)||0]),focusVersions:preview.tasks.map(item=>[item.id,this._taskFocusVersions.get(item.id)||0])});return {token:undoToken};
+ scheduleStageRange(input){
+  fields(input,['id','startDate','endDate','expected'],'阶段改期格式不正确');const stage=stageAt(this.state,input.id);range(input.startDate,input.endDate);
+  fields(input.expected,['startDate','endDate','updatedAt'],'阶段日期信息已失效，请重新打开日期编辑');
+  ensure(['startDate','endDate','updatedAt'].every(key=>input.expected[key]===stage[key]),'阶段已有变化，请重新打开日期编辑后调整');
+  const before={startDate:stage.startDate,endDate:stage.endDate},token=randomUUID();
+  this.mutate(s=>{const current=stageAt(s,input.id);current.startDate=input.startDate;current.endDate=input.endDate;current.updatedAt=taskTimestamp(current);});
+  remember(this._stageUndos,token,{id:stage.id,before,stageVersion:this._stageScheduleVersions.get(stage.id)||0});return {token};
  },
  undoStageSchedule(undo){
-  fields(undo,['token'],'撤销内容无效');const saved=this._stageUndos.get(undo.token);ensure(saved,'此次改期已无法撤销，请重新安排日期');const {preview}=saved,focusVersions=new Map(saved.focusVersions),stage=stageAt(this.state,preview.id);ensure((this._stageScheduleVersions.get(stage.id)||0)===saved.stageVersion,'阶段日期已有变化，无法撤销本次改期');for(const [id,version] of saved.taskVersions)ensure((this._taskScheduleVersions.get(id)||0)===version,'任务日期或归属已有变化，无法撤销本次改期');
-  const result=this.mutate(s=>{const stage=stageAt(s,preview.id),now=new Date().toISOString(),focusSkipped=[];stage.startDate=preview.before.startDate;stage.endDate=preview.before.endDate;stage.updatedAt=now;for(const entry of preview.tasks){const task=this.get(s,entry.id);task.plannedDate=entry.from;task.plannedEndDate=entry.fromEnd;if(!containsDate(entry.from,entry.fromEnd,task.focusDate))task.focusDate=null;task.updatedAt=taskTimestamp(task);}for(const entry of preview.tasks){const task=this.get(s,entry.id);if(!entry.focusDate||task.focusDate||(this._taskFocusVersions.get(entry.id)||0)!==focusVersions.get(entry.id))continue;if(task.status==='done'||s.tasks.filter(t=>t.status==='todo'&&t.focusDate===entry.focusDate).length<3)task.focusDate=entry.focusDate;else focusSkipped.push(task.title);}return {focusSkipped};});this._stageUndos.delete(undo.token);return result;
+  fields(undo,['token'],'撤销内容无效');const saved=this._stageUndos.get(undo.token);ensure(saved,'此次改期已无法撤销，请重新安排日期');const stage=stageAt(this.state,saved.id);
+  ensure((this._stageScheduleVersions.get(stage.id)||0)===saved.stageVersion,'阶段日期已有变化，无法撤销本次改期');
+  this.mutate(s=>{const current=stageAt(s,saved.id);Object.assign(current,saved.before);current.updatedAt=taskTimestamp(current);});this._stageUndos.delete(undo.token);return {};
  }
 };
 module.exports={validateOrganization,association,projectMethods,initializeGuards,trackRevisions,date,dayNumber,shiftDate,containsDate,remember,taskTimestamp};

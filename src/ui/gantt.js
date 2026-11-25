@@ -28,7 +28,7 @@
     plannedEndDate: task.plannedEndDate || task.plannedDate || null, updatedAt: task.updatedAt });
 
   function render({ container, toolbarContainer, project, stages = [], tasks = [], session = {}, onTask = () => {},
-    onStage = () => {}, onSchedule = () => {}, onTaskSchedule = async () => {}, onSessionChange = () => {} }) {
+    onStage = () => {}, onSchedule = async () => {}, onTaskSchedule = async () => {}, onSessionChange = () => {} }) {
     if (!container || !project) return () => {};
     const phases = stages.filter(s => s.projectId === project.id).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
     const entries = tasks.filter(t => t.projectId === project.id), groups = new Map(phases.map(s => [s.id, []])), ungrouped = [];
@@ -78,7 +78,6 @@
       if (!drag) return;
       const d = drag; drag = null;
       position(d.bar, d.start, d.end); d.bar.classList.remove('is-dragging');
-      d.bar.querySelector('.gantt-drag-range')?.remove();
       if (d.control.hasPointerCapture?.(d.pointerId)) d.control.releasePointerCapture(d.pointerId);
       if (announce && d.active) message('已取消本次拖动');
     }
@@ -128,6 +127,18 @@
         if (!stopped) { renderInspector(); message(`${error?.message || '日期未能保存'}；候选日期已保留，可重试。`, true); }
       }
     }
+    async function commitStage(item, startDate, endDate) {
+      if (saving) return;
+      saving = true;
+      const proposal = { id: item.id, startDate, endDate,
+        expected: { startDate: item.startDate, endDate: item.endDate, updatedAt: item.updatedAt } };
+      try {
+        await onSchedule(proposal);
+        if (!stopped) { Object.assign(item, { startDate, endDate }); saving = false; draw(); }
+      } catch (error) {
+        if (!stopped) message(error?.message || '日期未能保存，请重试。', true);
+      } finally { saving = false; }
+    }
     function renderInspector() {
       if (!inspector) return;
       inspector.replaceChildren();
@@ -175,10 +186,8 @@
       const d = drag, shift = Math.round((d.lastX - d.x + viewport.scrollLeft - d.scroll) / dayWidth);
       [d.nextStart, d.nextEnd] = nextDates(d.start, d.end, d.mode, shift);
       position(d.bar, d.nextStart, d.nextEnd); d.bar.classList.add('is-dragging');
-      let label = d.bar.querySelector('.gantt-drag-range');
-      if (!label) { label = node('span', 'gantt-drag-range'); d.bar.append(label); }
       const text = `${date(d.nextStart)}—${date(d.nextEnd)} · ${d.nextEnd - d.nextStart + 1} 天`;
-      label.textContent = text; live.textContent = `${text}，Escape 取消`;
+      live.textContent = `${text}，Escape 取消`;
     }
     function autoScroll() {
       frame = 0;
@@ -206,7 +215,7 @@
           selectTask(item); session.focusControl = { id: item.id, edge: mode };
           void commitTask(item, candidate(item, date(a), date(b)));
         }
-        else onSchedule({ id: item.id, startDate: date(a), endDate: date(b) });
+        else { session.focusControl = { id: item.id, edge: mode, kind: 'stage' }; void commitStage(item, date(a), date(b)); }
       });
       control.addEventListener('pointerdown', event => {
         if (event.button !== 0 || !event.isPrimary || saving) return;
@@ -230,7 +239,7 @@
         if (!d.active || (d.start === d.nextStart && d.end === d.nextEnd)) return;
         const proposal = { id: item.id, startDate: date(d.nextStart), endDate: date(d.nextEnd) };
         if (kind === 'task') void commitTask(item, candidate(item, proposal.startDate, proposal.endDate));
-        else onSchedule(proposal);
+        else void commitStage(item, proposal.startDate, proposal.endDate);
       });
       control.addEventListener('pointercancel', () => cancelDrag(true));
       control.addEventListener('lostpointercapture', () => cancelDrag(true));
@@ -357,7 +366,7 @@
       viewport.addEventListener('scroll', () => { saveScroll(); if (drag?.active) updateDrag(); }, { passive: true });
       if (session.focusControl) {
         const focus = session.focusControl; delete session.focusControl;
-        root.querySelector(`[data-task-bar="${CSS.escape(focus.id)}"] [data-edge="${CSS.escape(focus.edge)}"]`)?.focus({ preventScroll: true });
+        root.querySelector(`[data-${focus.kind === 'stage' ? 'stage' : 'task'}-bar="${CSS.escape(focus.id)}"] [data-edge="${CSS.escape(focus.edge)}"]`)?.focus({ preventScroll: true });
       }
     }
     const keydown = event => { if (event.key === 'Escape' && drag) { event.preventDefault(); cancelDrag(true); } };

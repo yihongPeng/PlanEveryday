@@ -63,8 +63,8 @@
   host.querySelector('button').onclick=async()=>{
    try{
     if(!await confirm('扩展阶段时间？','只扩展阶段范围，任务日期与提醒均不改变。请另行保存尚未保存的任务修改。','扩展阶段'))return;
-    const preview=await ctx.api('previewStageSchedule',{id:stage.id,startDate:date<stage.startDate?date:stage.startDate,endDate:end>stage.endDate?end:stage.endDate,shiftTasks:false});
-    await ctx.api('applyStageSchedule',preview);await ctx.refresh();ctx.openTask(task.id);ctx.toast('阶段范围已扩展');
+    await ctx.api('scheduleStageRange',{id:stage.id,startDate:date<stage.startDate?date:stage.startDate,endDate:end>stage.endDate?end:stage.endDate,expected:{startDate:stage.startDate,endDate:stage.endDate,updatedAt:stage.updatedAt}});
+    await ctx.refresh();ctx.openTask(task.id);ctx.toast('阶段范围已扩展');
    }catch(e){ctx.toast(e.message);}
   };
  }

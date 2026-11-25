@@ -67,7 +67,6 @@
 .is-selected .gantt-task-bar { background: var(--gantt-selected); color: #ffffff; box-shadow: none; }
 .gantt-bar.is-dragging { z-index: 5; outline: 2px solid #356247; outline-offset: 2px; }
 .gantt-bar.is-dragging .gantt-bar-move { cursor: grabbing; }
-.gantt-drag-range { position: absolute; left: 0; top: -1px; min-height: 27px; background: #356247; color: #fffefa; padding: 3px 6px; border-radius: 4px; font-size: 12px; line-height: 20px; white-space: nowrap; pointer-events: none; }
 .gantt-stage-bar { top: 4px; height: 27px; border-radius: 0; background: transparent; color: #809177; box-shadow: none; }
 .gantt-stage-bar::before { content: ''; position: absolute; left: 0; right: 0; top: 12px; height: 3px; border-radius: 2px; background: #aebcac; pointer-events: none; }
 .gantt-stage-bar.is-done { background: transparent; box-shadow: none; }
