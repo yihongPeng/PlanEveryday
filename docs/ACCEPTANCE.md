@@ -19,7 +19,9 @@
 
 用户从应用内正常退出验收版后，归档三份项目预览的内容和设计样稿到 D 盘 `backups/project-preview-content-20261125-v060.zip`，逐项验证 225 个文件哈希，再清理 31 个目标（专用桌面入口、临时程序、预览库、提取目录、一次性脚本和样稿）。路径和进程先行核对，正式数据及历史正式发布包保持不动。详情记录 `test-results/release-060/preview-cleanup.json`。下文这些预览入口现已失效，仅作历史证据。
 
-GitHub 公开状态与附件核验结果在发布后追加，以上构建成功不等于已公开可更新。
+后续尝试批量清理无界面回归产生的 `test-results` 下 `temp`、`data-*`、`sample-*` 子目录时，执行前被自动审批策略拒绝，工具仅返回 `blocked by policy`。该批命令没有执行，额外测试缓存仍留在 D 盘；没有改用其他执行方式绕过拦截。它们受 Git 和打包排除，不属于用户试用库或正式数据。已完成的 31 个验收目标清理不受影响。
+
+发布完成：源码提交 `3068896fb118e8598891ea3aa891a635a249aad8` 已推送 main，tag `v0.6.0` 指向该提交。[GitHub Release 0.6.0](https://github.com/yihongPeng/PlanEveryday/releases/tag/v0.6.0) 先上传到草稿，三件附件状态、大小、SHA-256 与本地一致后公开并设为 latest。匿名访问 latest 下载地址返回 0.6.0；完整下载 121,701,376 字节外层安装包，SHA-512 匹配，latest.yml 和 blockmap 逐字节一致。公开 README 三张图片也与本地一致。证据：`test-results/release-060/github-assets.json` 与 `public-download-check.json`。第一次创建草稿时 GitHub 拒绝短 SHA 的 target_commitish，改为完整已推送 SHA 后成功；没有公开缺少附件的中间版本。这些核验确认公开分发完整，不代替真实旧安装版的升级/重开验收。
 
 ## 2026-11-25 甘特图美术细化（最新验收包，未发布）
 
