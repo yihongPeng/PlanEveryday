@@ -1,9 +1,10 @@
+const {testDirectory}=require('../tests/test-paths.cjs');
 const {_electron:electron}=require('playwright');
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os');
 const {execFileSync}=require('node:child_process');
 const root=path.resolve(__dirname,'..');
 const label=process.env.PROFILE_LABEL||'current';
-const data=fs.mkdtempSync(path.join(os.tmpdir(),'yaya-profile-'));
+const data=testDirectory('yaya-profile-');
 const executablePath=process.env.PLANEVERYDAY_EXE||require('electron');
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 let app;

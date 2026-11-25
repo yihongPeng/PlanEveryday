@@ -1,12 +1,12 @@
+const {testDirectory}=require('../tests/test-paths.cjs');
 const { _electron: electron } = require('playwright');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const os = require('node:os');
 const { spawn } = require('node:child_process');
 const { Store, today } = require('../src/store.cjs');
 const root = path.resolve(__dirname,'..');
-const dataDir = fs.mkdtempSync(path.join(os.tmpdir(),'planeveryday-native-'));
+const dataDir = testDirectory('planeveryday-native-');
 const executablePath = process.env.PLANEVERYDAY_EXE || require('electron');
 const args = process.env.PLANEVERYDAY_EXE ? [] : [root];
 const pause = ms => new Promise(r=>setTimeout(r,ms));

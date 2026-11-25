@@ -1,6 +1,7 @@
+const {testDirectory}=require('../tests/test-paths.cjs');
 const {_electron:electron}=require('playwright');
-const assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
-const root=path.resolve(__dirname,'..'),data=fs.mkdtempSync(path.join(os.tmpdir(),'yaya-hibernate-'));
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const root=path.resolve(__dirname,'..'),data=testDirectory('yaya-hibernate-');
 (async()=>{const app=await electron.launch({args:[root],env:{...process.env,PLANEVERYDAY_DATA_DIR:data,PLANEVERYDAY_SUSPEND_MS:'500'}});try{
  await app.firstWindow();let page;for(let i=0;i<30;i++){page=app.windows().find(p=>p.url().endsWith('index.html'));if(page)break;await new Promise(r=>setTimeout(r,100));}
  await page.locator('#quick-title').fill('休眠后应保留的输入');await page.locator('#hide').click();await new Promise(r=>setTimeout(r,1400));

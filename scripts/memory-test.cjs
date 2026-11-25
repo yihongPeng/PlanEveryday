@@ -1,11 +1,12 @@
 'use strict';
+const {testDirectory}=require('../tests/test-paths.cjs');
+
 const {_electron:electron}=require('playwright');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
-const os=require('node:os');
 const path=require('node:path');
 const root=path.resolve(__dirname,'..');
-const dataDir=fs.mkdtempSync(path.join(os.tmpdir(),'planeveryday-memory-'));
+const dataDir=testDirectory('planeveryday-memory-');
 const results=path.join(root,'test-results');fs.mkdirSync(results,{recursive:true});
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const report=[];let app;const errors=[];

@@ -17,7 +17,7 @@ function saveBackup(file,backup){
 }
 function validateAttachments(backup){
  const refs=references(backup.knowledge),items=backup.attachments||[];
- if(!Array.isArray(items)||items.length>10000||(backup.schemaVersion===4&&!Array.isArray(backup.attachments)))throw Error('图片附件格式不正确');
+ if(!Array.isArray(items)||items.length>10000||(backup.schemaVersion>=4&&!Array.isArray(backup.attachments)))throw Error('图片附件格式不正确');
  const found=new Map();let total=0;
  for(const item of items){
   if(!item||typeof item.name!=='string'||!/^[a-f0-9]{64}\.png$/.test(item.name)||found.has(item.name)||typeof item.data!=='string'||item.data.length>Math.ceil(MAX_IMAGE/3)*4||!(/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/).test(item.data))throw Error('图片附件格式不正确');
@@ -28,9 +28,9 @@ function validateAttachments(backup){
  return found;
 }
 class Media{
- constructor(directory){this.directory=path.join(directory,'images');fs.mkdirSync(this.directory,{recursive:true});}
+ constructor(directory,{readOnly=false}={}){this.directory=path.join(directory,'images');this.readOnly=readOnly;if(!readOnly)fs.mkdirSync(this.directory,{recursive:true});}
  add(bytes){checkPNG(bytes);const name=hash(bytes);this.write(name,bytes);return 'plan-image://local/'+name;}
- write(name,bytes){const file=path.join(this.directory,name);if(fs.existsSync(file)){if(!fs.readFileSync(file).equals(bytes))throw Error('已有图片校验失败，请恢复完整备份');return false;}const temp=file+'.'+randomUUID()+'.tmp';try{fs.writeFileSync(temp,bytes,{flag:'wx'});fs.renameSync(temp,file);}finally{if(fs.existsSync(temp))fs.unlinkSync(temp);}return true;}
+ write(name,bytes){if(this.readOnly)throw Error('历史图片目录只允许读取');const file=path.join(this.directory,name);if(fs.existsSync(file)){if(!fs.readFileSync(file).equals(bytes))throw Error('已有图片校验失败，请恢复完整备份');return false;}const temp=file+'.'+randomUUID()+'.tmp';try{fs.writeFileSync(temp,bytes,{flag:'wx'});fs.renameSync(temp,file);}finally{if(fs.existsSync(temp))fs.unlinkSync(temp);}return true;}
  read(url){const match=pattern.exec(url);if(!match)throw Error('无效图片地址');const bytes=checkPNG(fs.readFileSync(path.join(this.directory,match[1])));if(hash(bytes)!==match[1])throw Error('图片校验失败');return bytes;}
  checkBudget(knowledge){let total=0;for(const name of references(knowledge)){total+=fs.statSync(path.join(this.directory,name)).size;if(total>MAX_TOTAL)throw Error('笔记图片总量不能超过 100 MB，请移除部分图片后保存');}}
  archiveCurrent(backup,folder){
@@ -40,8 +40,9 @@ class Media{
   for(const name of references(backup.knowledge)){try{fs.copyFileSync(path.join(this.directory,name),path.join(folder,'images',name));}catch(error){if(error.code==='ENOENT')missing.push(name);else throw error;}}
   saveBackup(path.join(folder,'recovery-state.json'),{format:'PlanEveryday-emergency-archive',backup,missingImages:missing});
  }
- export(backup){const attachments=[...references(backup.knowledge)].map(name=>({name,data:this.read('plan-image://local/'+name).toString('base64')}));const result={...backup,schemaVersion:4,attachments};validateAttachments(result);return result;}
+ export(backup){const attachments=[...references(backup.knowledge)].map(name=>({name,data:this.read('plan-image://local/'+name).toString('base64')}));const result={...backup,schemaVersion:backup.schemaVersion>=6?6:backup.schemaVersion>=5?5:4,attachments};validateAttachments(result);return result;}
  restore(backup,commit,decode=()=>{}){
+  if(this.readOnly)throw Error('历史图片目录只允许读取');
   const files=validateAttachments(backup);for(const bytes of files.values())decode(bytes);const changed=[];
   try{for(const [name,bytes] of files){const file=path.join(this.directory,name);let previous=null;
    if(fs.existsSync(file)){if(fs.readFileSync(file).equals(bytes))continue;previous=file+'.damaged-'+randomUUID();fs.renameSync(file,previous);}

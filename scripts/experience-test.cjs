@@ -1,6 +1,7 @@
+const {testDirectory}=require('../tests/test-paths.cjs');
 const {_electron:electron}=require('playwright');
-const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os');
-const root=path.resolve(__dirname,'..'),data=fs.mkdtempSync(path.join(os.tmpdir(),'yaya-experience-'));
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const root=path.resolve(__dirname,'..'),data=testDirectory('yaya-experience-');
 const exe=process.env.PLANEVERYDAY_EXE||require('electron');
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 (async()=>{const app=await electron.launch({executablePath:exe,args:process.env.PLANEVERYDAY_EXE?[]:[root],env:{...process.env,PLANEVERYDAY_DATA_DIR:data}});const checks=[];try{

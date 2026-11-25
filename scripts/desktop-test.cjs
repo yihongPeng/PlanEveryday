@@ -1,11 +1,11 @@
+const {testDirectory}=require('../tests/test-paths.cjs');
 const { _electron: electron } = require('playwright');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const os = require('node:os');
 const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const results = path.join(root, 'test-results'); fs.mkdirSync(results, { recursive: true });
-const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'planeveryday-test-'));
+const dataDir = testDirectory('planeveryday-test-');
 const executablePath = process.env.PLANEVERYDAY_EXE || require('electron');
 const launch = () => electron.launch({ executablePath, args: process.env.PLANEVERYDAY_EXE ? [] : [root], env: { ...process.env, PLANEVERYDAY_DATA_DIR: dataDir }, timeout: 30000 });
 const sleep = ms => new Promise(r => setTimeout(r, ms));

@@ -3,38 +3,41 @@
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' plan-image:; connect-src 'none'; object-src 'none'; base-uri 'none'">
-  <title>芽芽计划</title><link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="memory.css">
+  <title>芽芽计划</title><link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="memory.css"><link rel="stylesheet" href="projects.css"><link rel="stylesheet" href="gantt.css"><link rel="stylesheet" href="project-links.css"><link rel="stylesheet" href="navigation.css">
 </head>
 <body>
   <header class="titlebar"><div class="wordmark"><img src="../../assets/app.png" alt="">芽芽计划 <span>Plan Every Day</span></div><div class="window-controls"><button id="minimize" aria-label="最小化" title="最小化">−</button><button id="maximize" aria-label="最大化" title="最大化 / 还原">□</button><button id="hide" aria-label="收起到托盘" title="收起，芽芽继续陪你">×</button></div></header>
   <div class="app-shell">
     <aside class="sidebar">
       <nav aria-label="计划视图">
-        <button class="nav-item active" data-view="today"><span class="nav-icon">☀</span><span>我的今天</span><small id="count-today">0</small></button>
-        <button class="nav-item" data-view="inbox"><span class="nav-icon">▤</span><span>收集箱</span><small id="count-inbox">0</small></button>
-        <button class="nav-item" data-view="future"><span class="nav-icon">▦</span><span>接下来 7 天</span></button>
-        <button class="nav-item" data-view="done"><span class="nav-icon">✓</span><span>已完成</span></button>
-        <button class="nav-item" data-view="memory"><span class="nav-icon">▧</span><span>记背</span><small id="count-memory">0</small></button>
+        <button class="nav-item active" data-view="today"><span class="nav-icon" data-app-icon="today"></span><span>我的今天</span><small id="count-today">0</small></button>
+        <button class="nav-item" data-view="inbox"><span class="nav-icon" data-app-icon="inbox"></span><span>收集箱</span><small id="count-inbox">0</small></button>
+        <button class="nav-item" data-view="future"><span class="nav-icon" data-app-icon="future"></span><span>接下来 7 天</span></button>
+        <button class="nav-item" data-view="projects"><span class="nav-icon" data-app-icon="projects"></span><span>项目</span><small id="count-projects">0</small></button>
+        <button class="nav-item" data-view="done"><span class="nav-icon" data-app-icon="done"></span><span>已完成</span></button>
+        <button class="nav-item" data-view="memory"><span class="nav-icon" data-app-icon="memory"></span><span>记背</span><small id="count-memory">0</small></button>
       </nav>
-      <div class="sidebar-bottom"><button class="nav-item" data-view="events"><span class="nav-icon">♧</span><span>提醒记录</span><small id="count-events"></small></button><button class="nav-item" data-view="settings"><span class="nav-icon">⚙</span><span>偏好设置</span></button></div>
+      <div class="sidebar-bottom"><button class="nav-item" data-view="events"><span class="nav-icon" data-app-icon="events"></span><span>提醒记录</span><small id="count-events"></small></button><button class="nav-item" data-view="settings"><span class="nav-icon" data-app-icon="settings"></span><span>偏好设置</span></button></div>
     </aside>
     <main class="workspace" id="workspace">
-      <div class="page-top"><div><h1 id="page-title">我的今天<span class="heading-dot">.</span></h1><p id="subtitle"></p></div><button id="notifications" class="icon-button" title="提醒记录" aria-label="提醒记录">♧<b id="unread-dot" hidden></b></button></div>
+      <div class="page-top"><div><h1 id="page-title">我的今天<span class="heading-dot">.</span></h1><p id="subtitle"></p></div><button id="notifications" class="icon-button" title="提醒记录" aria-label="提醒记录"><span data-app-icon="events"></span><b id="unread-dot" hidden></b></button></div>
       <section id="today-banner" class="today-summary"><p id="progress-text"></p></section>
       <section id="task-tools">
         <form id="quick-form" class="quick-form"><span class="add-symbol">＋</span><input id="quick-title" maxlength="200" placeholder="记一件今天要做的事…" aria-label="新任务标题" autocomplete="off"><button type="submit" class="primary-button" id="quick-add" title="Enter 保存">添加 <span>↵</span></button></form>
         <div class="entry-meta"><label>安排到 <input type="date" id="quick-date" aria-label="新任务计划日期"></label><button id="quick-inbox" class="text-button">先放收集箱</button><span class="keyboard-hint">Enter 连续记录</span></div>
         <div id="week-strip" class="week-strip" hidden></div>
-        <div class="list-toolbar"><label class="search-box"><span>⌕</span><input id="search" placeholder="搜索当前列表" aria-label="搜索任务"></label><select id="priority-filter" aria-label="按优先级筛选"><option value="all">全部优先级</option><option value="urgent">紧急</option><option value="important">重要</option><option value="normal">普通</option></select><button id="multi-toggle" class="text-button">多选</button></div>
-        <div id="batch-bar" class="batch-bar" hidden><span id="batch-count">已选 0 项</span><button data-batch="today">今天</button><button data-batch="tomorrow">明天</button><input type="date" id="batch-date" aria-label="批量安排日期"><button id="batch-apply">安排</button><button data-batch="inbox">收集箱</button></div>
+        <div class="list-toolbar"><label class="search-box"><span data-app-icon="search"></span><input id="search" placeholder="搜索当前列表" aria-label="搜索任务"></label><select id="priority-filter" aria-label="按优先级筛选"><option value="all">全部优先级</option><option value="urgent">紧急</option><option value="important">重要</option><option value="normal">普通</option></select><button id="multi-toggle" class="text-button">多选</button></div>
+        <div id="batch-bar" class="batch-bar" hidden><span id="batch-count">已选 0 项</span><button data-batch="today">今天</button><button data-batch="tomorrow">明天</button><input type="date" id="batch-date" aria-label="批量安排日期"><button id="batch-apply">安排</button><button data-batch="inbox">收集箱</button><button id="batch-project">归入项目</button></div>
       </section>
       <div class="content-scroll" id="content"></div>
     </main>
     <aside id="detail" class="detail-panel" hidden></aside>
   </div>
-  <nav class="mobile-nav" aria-label="快捷导航"><button data-view="today" class="active">☀ <span>今天</span></button><button data-view="inbox">▤ <span>收集箱</span></button><button data-view="future">▦ <span>安排</span></button><button data-view="memory">▧ <span>记背</span></button><button data-view="done">✓ <span>完成</span></button><button data-view="settings">⚙ <span>设置</span></button></nav>
+  <nav class="mobile-nav" aria-label="快捷导航"><button data-view="today" class="active"><span class="nav-icon" data-app-icon="today"></span><span>今天</span></button><button data-view="inbox"><span class="nav-icon" data-app-icon="inbox"></span><span>收集箱</span></button><button data-view="future"><span class="nav-icon" data-app-icon="future"></span><span>安排</span></button><button data-view="projects"><span class="nav-icon" data-app-icon="projects"></span><span>项目</span></button><button data-view="memory"><span class="nav-icon" data-app-icon="memory"></span><span>记背</span></button><button data-view="more"><span class="nav-icon" data-app-icon="more"></span><span>更多</span></button></nav>
   <div id="toast" role="status" hidden></div>
-  <dialog id="schedule-dialog"><form method="dialog" class="dialog-head"><h2>安排这件事</h2><button aria-label="关闭">×</button></form><p id="schedule-task-title"></p><div class="schedule-shortcuts"><button data-schedule="today">今天</button><button data-schedule="tomorrow">明天</button><button data-schedule="inbox">收集箱</button></div><label class="field">选择日期<input type="date" id="schedule-date"></label><p id="schedule-reminder" class="muted"></p><button id="schedule-apply" class="primary-button full">安排到这一天</button></dialog>
+  <dialog id="schedule-dialog"><form method="dialog" class="dialog-head"><h2>安排这件事</h2><button aria-label="关闭">×</button></form><p id="schedule-task-title"></p><div class="schedule-shortcuts"><button data-schedule="today">今天开始</button><button data-schedule="tomorrow">明天开始</button><button data-schedule="inbox">收集箱</button></div><label class="field">选择开始日<input type="date" id="schedule-date"></label><p id="schedule-duration"></p><p id="schedule-reminder" class="muted"></p><button id="schedule-apply" class="primary-button full">从这一天开始</button></dialog>
   <dialog id="focus-dialog"><h2>今天先专注这三件事</h2><p class="muted">若想加入新的重点，选择一项替换。原任务仍会保留。</p><div id="focus-options"></div><button id="focus-cancel" class="secondary-button full">暂时不换</button></dialog>
-  <script src="vendor/markdown-it.min.js"></script><script src="vendor/highlight.min.js"></script><script src="markdown.js"></script><script src="memory-outline.js"></script><script src="memory.js"></script><script src="app.js"></script>
+  <dialog id="assignment-dialog"><form id="assignment-form"><div class="dialog-head"><h2>归入项目</h2><button type="button" data-close-assignment aria-label="关闭">×</button></div><p id="assignment-count" class="muted"></p><div id="assignment-fields"></div><p class="muted">只调整归属，安排日期、提醒和完成状态保持不变。</p><p class="error-message" role="alert" id="assignment-error"></p><button type="submit" class="primary-button full">保存归属</button></form></dialog>
+  <dialog id="shared-confirm-dialog"><form method="dialog"><h2 id="shared-confirm-title"></h2><p id="shared-confirm-text" class="muted"></p><div class="shared-confirm-actions"><button value="cancel" class="secondary-button">取消</button><button value="confirm" class="primary-button" id="shared-confirm-yes">继续</button></div></form></dialog>
+  <script src="vendor/markdown-it.min.js"></script><script src="vendor/highlight.min.js"></script><script src="markdown.js"></script><script src="memory-outline.js"></script><script src="memory.js"></script><script src="task-dates.js"></script><script src="icons.js"></script><script src="gantt.js"></script><script src="projects.js"></script><script src="project-links.js"></script><script src="app.js"></script>
 </body></html>

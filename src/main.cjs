@@ -224,6 +224,18 @@ const actions = {
   confirmDiscard: async () => (await dialog.showMessageBox(mainWindow,{type:'question',buttons:['继续编辑','放弃修改'],defaultId:0,cancelId:0,message:'放弃尚未保存的修改？',noLink:true})).response===1,
   add: data => store.addTask(data),
   update: data => store.updateTask(data.id, data.patch),
+  addProject: data => store.addProject(data),
+  updateProject: ({id,patch}) => store.updateProject(id,patch),
+  deleteProject: ({id}) => store.deleteProject(id),
+  addStage: data => store.addStage(data),
+  updateStage: ({id,patch}) => store.updateStage(id,patch),
+  deleteStage: ({id}) => store.deleteStage(id),
+  assignTasks: ({ids,...assignment}) => store.assignTasks(ids,assignment),
+  previewStageSchedule: data => store.previewStageSchedule(data),
+  applyStageSchedule: data => store.applyStageSchedule(data),
+  undoStageSchedule: data => store.undoStageSchedule(data),
+  scheduleTaskRange: data => store.scheduleTaskRange(data),
+  undoTaskRange: data => store.undoTaskRange(data),
   delete: async ({ id }) => {
     const answer = await dialog.showMessageBox(mainWindow, { type: 'question', buttons: ['保留任务', '删除任务'], defaultId: 0, cancelId: 0, message: '删除这项任务？', detail: '删除后无法撤销。', noLink: true });
     if (answer.response !== 1) return false;
@@ -250,7 +262,7 @@ const actions = {
     if (canceled) return false;
     if (fs.statSync(filePaths[0]).size > MAX_BACKUP) throw Error('备份文件过大，最大支持 150 MB。');
     const backup = validateBackup(JSON.parse(fs.readFileSync(filePaths[0], 'utf8')));
-    const answer = await dialog.showMessageBox(mainWindow, { type: 'warning', message: `恢复 ${backup.tasks.length} 项任务和 ${backup.knowledge?.length||0} 个知识点？`, detail: '将替换当前任务和全部记背内容，旧版备份没有记背内容时将清空当前记背。恢复前会自动保留当前数据备份；过去的提醒不会重新弹出。', buttons: ['取消', '恢复备份'], defaultId: 0, cancelId: 0, noLink: true });
+    const answer = await dialog.showMessageBox(mainWindow, { type: 'warning', message: `恢复 ${backup.tasks.length} 项任务、${backup.knowledge?.length||0} 个知识点和 ${backup.projects?.length||0} 个项目？`, detail: '将整体替换当前任务、记背与项目。'+(backup.schemaVersion<5?'此旧版备份没有项目结构，恢复后项目与阶段将清空，任务归为未归项目。':'')+'旧版备份没有记背内容时将清空当前记背。恢复前会自动保留当前数据备份；过去的提醒不会重新弹出。', buttons: ['取消', '恢复备份'], defaultId: 0, cancelId: 0, noLink: true });
     if (answer.response !== 1) return false;
     const folder = path.join(app.getPath('userData'), 'backups'); fs.mkdirSync(folder, { recursive: true });
     const current=store.exportBackup();let complete;
@@ -266,7 +278,7 @@ ipcMain.handle('planner', async (event, action, data) => {
   if (event.sender === petWindow?.webContents && action !== 'snapshot') return { ok: false, error: '无权执行' };
   if(updates?.snapshot().phase==='installing'&&!['snapshot','session:restored'].includes(action))return {ok:false,error:'正在准备更新，请稍候。'};
   if (!Object.hasOwn(actions, action)) return { ok: false, error: '不支持的操作' };
-  try { const result = await actions[action](data); if (action !== 'snapshot'&&!action.startsWith('update:')) broadcast(); return { ok: true, data: result }; }
+  try { const result = await actions[action](data); if (!['snapshot','previewStageSchedule'].includes(action)&&!action.startsWith('update:')) broadcast(); return { ok: true, data: result }; }
   catch (error) { return { ok: false, error: error.message || '操作失败，请重试。' }; }
 });
 ipcMain.on('pet-action', (event, action, data) => {

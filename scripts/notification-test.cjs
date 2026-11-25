@@ -1,6 +1,7 @@
+const {testDirectory}=require('../tests/test-paths.cjs');
 const {_electron:electron}=require('playwright');
-const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os');
-const root=path.resolve(__dirname,'..'),data=fs.mkdtempSync(path.join(os.tmpdir(),'yaya-notify-'));
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const root=path.resolve(__dirname,'..'),data=testDirectory('yaya-notify-');
 const exe=process.env.PLANEVERYDAY_EXE||require('electron'),pause=ms=>new Promise(r=>setTimeout(r,ms));
 let app,shortcut;const checks=[];
 async function pageFor(){for(let i=0;i<80;i++){const p=app.windows().find(w=>w.url().endsWith('index.html'));if(p){await p.locator('#quick-title').waitFor();return p;}await pause(100);}throw Error('window unavailable');}
