@@ -255,7 +255,6 @@
         const label = `${item.title}，${date(start)}至${date(end)}，${mode === 'move' ? '整体平移' : `调整${mode === 'start' ? '开始' : '结束'}日`}；方向键按一天调整`;
         const control = button('', mode === 'move' ? 'gantt-bar-move' : `gantt-bar-handle gantt-bar-${mode}`, null, label);
         control.dataset.edge = mode;
-        if (mode === 'move') control.append(node('span', 'gantt-bar-label', kind === 'task' ? `${isDone ? '✓ ' : ''}${end - start >= 2 ? item.title : ''}` : ''));
         if ((mode === 'start' && start < currentStart) || (mode === 'end' && end > currentEnd)) control.hidden = true;
         controlEvents(control, bar, item, kind, mode, start, end); bar.append(control);
       }
@@ -279,11 +278,12 @@
     }
     function stageRows(stage, rows) {
       const r = row('stage'), list = groups.get(stage.id), isCollapsed = collapsed.has(stage.id); r.row.dataset.stageId = stage.id;
-      const toggle = button(isCollapsed ? '›' : '⌄', 'gantt-collapse', () => {
+      const toggle = button('', 'gantt-collapse', () => {
         saveScroll(); isCollapsed ? collapsed.delete(stage.id) : collapsed.add(stage.id); session.collapsed = [...collapsed]; draw(); notify();
         root.querySelector(`[data-stage-toggle="${CSS.escape(stage.id)}"]`)?.focus({ preventScroll: true });
       }, `${isCollapsed ? '展开' : '收起'}${stage.title}的任务`);
       toggle.dataset.stageToggle = stage.id; toggle.setAttribute('aria-expanded', String(!isCollapsed));
+      toggle.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 4 4 4-4 4"/></svg>';
       const title = button(stage.title, 'gantt-name-button gantt-stage-name', () => onStage(stage.id), `编辑阶段：${stage.title}`);
       const count = list.length ? `${list.filter(t => t.status === 'done').length}/${list.length} 项` : '尚无任务';
       title.title = `${stage.title} · ${count}`; r.name.append(toggle, title, node('span', 'gantt-stage-count', count));

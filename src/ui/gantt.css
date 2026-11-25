@@ -42,7 +42,9 @@
 .gantt-weekend { position: absolute; top: 0; bottom: 0; width: var(--gantt-day); background: #f8faf780; pointer-events: none; }
 .gantt-stage-row { height: 36px; }
 .gantt-stage-row .gantt-name, .gantt-stage-row .gantt-track { background-color: var(--gantt-phase); }
-.gantt-collapse { flex: 0 0 25px; width: 25px; min-height: 32px; padding: 0; font-size: 19px !important; color: #64785a; }
+.gantt-collapse { flex: 0 0 25px; width: 25px; min-height: 32px; padding: 0; display: grid; place-items: center; color: #637067; }
+.gantt-collapse svg { display: block; width: 14px; height: 14px; pointer-events: none; }
+.gantt-collapse[aria-expanded="true"] svg { transform: rotate(90deg); }
 .gantt-name-button { text-align: left; min-width: 0; max-width: 100%; min-height: 32px; padding: 0; }
 .gantt-stage-name { flex: 1; font-size: 13px !important; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #242c28; }
 .gantt-stage-count, .gantt-duration { font-size: 12px; color: #637067; font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0; }
@@ -57,7 +59,6 @@
 .gantt-task-bar:hover { filter: brightness(.97); }
 .gantt-bar>button:hover { background: transparent; }
 .gantt-bar-move { flex: 1; min-width: 0; height: 100%; min-height: 0; padding: 0 3px; color: inherit; text-align: left; cursor: grab; border-radius: 4px; touch-action: none; user-select: none; overflow: hidden; }
-.gantt-bar-label { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; pointer-events: none; }
 .gantt-bar-handle { flex: 0 0 11px; width: 11px; height: 100%; min-height: 0; padding: 0; display: grid; place-items: center; color: inherit; border-radius: 4px; opacity: 0; touch-action: none; cursor: ew-resize; }
 .gantt-bar-handle::after { content: ''; width: 2px; height: 11px; border-radius: 1px; background: currentColor; opacity: .65; }
 .gantt-bar-handle[hidden] { display: none; }
