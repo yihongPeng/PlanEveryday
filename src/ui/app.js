@@ -7,7 +7,7 @@ const localTimeInput = value => { if (!value) return ''; const d = new Date(valu
 const taskDates = window.TaskDates;
 const completedToday = task => task.status === 'done' && task.completedAt && localTimeInput(task.completedAt).slice(0,10) === localDate();
 let state = { tasks: [], events: [], settings: {} }, view = 'today', day = localDate(), search = '', filter = 'all', selectedId = null;
-let multi = false, selection = new Set(), drafts = new Map(), scheduleId, focusId, toastTimer, refreshTicket = 0, lastDay = localDate(), completing = false;
+let multi = false, selection = new Set(), drafts = new Map(), scheduleId, focusId, toastTimer, toastExpiresAt = 0, refreshTicket = 0, lastDay = localDate(), completing = false;
 let sessionRestored = false;
 const taskDraftValues=task=>({title:task.title,notes:task.notes,plannedDate:task.plannedDate||'',plannedEndDate:taskDates.end(task)||'',priority:task.priority,reminderAt:localTimeInput(task.reminderAt),projectId:task.projectId||'',stageId:task.stageId||''});
 function reconcileTaskDrafts(previous,next){
@@ -34,11 +34,21 @@ function refreshOpenDetail(id){
 window.captureSessionState = () => {window.ProjectView?.captureSession();return { captureDay:lastDay,view,day,search,filter,selectedId,multi,selection:[...selection],drafts:[...drafts],quickTitle:$('#quick-title').value,quickDate:$('#quick-date').value,scroll:$('#content').scrollTop,detailScroll:$('#detail').scrollTop,storage:Object.fromEntries(Object.keys(sessionStorage).map(key=>[key,sessionStorage.getItem(key)])) };};
 const priorityNames = { normal: '普通', important: '重要', urgent: '紧急' };
 async function api(action, data) { const result = await window.planner.invoke(action, data); if (!result.ok) throw Error(result.error); return result.data; }
+function hideToast() {
+ clearTimeout(toastTimer); toastExpiresAt = 0; $('#toast').hidden = true;
+}
+function expireToast() {
+ if (toastExpiresAt && Date.now() >= toastExpiresAt) hideToast();
+}
 function toast(message, undo) {
  clearTimeout(toastTimer); const box = $('#toast'); box.replaceChildren(document.createTextNode(message)); box.hidden = false;
  if (undo) { const b = document.createElement('button'); b.textContent = '撤销'; b.onclick = () => run(async () => {b.disabled=true;try{if(typeof undo==='function'){await undo();return;}const result = await api('undoSchedule', undo); await refresh(); for (const item of undo) { const draft = drafts.get(item.id); const restored = state.tasks.find(t => t.id === item.id); if (draft && restored) {draft.plannedDate = restored.plannedDate || '';draft.plannedEndDate = taskDates.end(restored) || '';} } if (selectedId && undo.some(item => item.id === selectedId)) openDetail(selectedId); toast(result?.focusSkipped?.length ? '日期已恢复；重点名额已用满，保留当前的 3 项重点。' : '已恢复原来的安排');}finally{b.disabled=false;} }); box.append(b); }
- toastTimer = setTimeout(() => box.hidden = true, undo ? 9000 : 4200);
+ const duration = undo ? 5000 : 3000;
+ toastExpiresAt = Date.now() + duration;
+ toastTimer = setTimeout(hideToast, duration);
 }
+window.addEventListener('focus', expireToast);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) expireToast(); });
 async function run(fn) { try { await fn(); } catch (error) { toast(error.message); } }
 async function refresh() {
  const ticket = ++refreshTicket; const next = await api('snapshot'); if (ticket !== refreshTicket) return;

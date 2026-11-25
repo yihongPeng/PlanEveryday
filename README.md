@@ -4,7 +4,7 @@
 
 **下载使用：[最新 Windows 安装版](https://github.com/yihongPeng/PlanEveryday/releases/latest)** · [源码仓库](https://github.com/yihongPeng/PlanEveryday)
 
-下载并运行 `PlanEveryday-Setup-0.6.0.exe`，安装程序会创建桌面入口。当前版本需要 Windows 10/11 x64 和可写的 **D 盘**，数据与缓存固定在 `D:\PlanEverydayData`；无需登录。代码采用 [MIT 许可证](LICENSE)，欢迎下载使用和改进。
+下载并运行 `PlanEveryday-Setup-0.6.1.exe`，安装程序会创建桌面入口。当前版本需要 Windows 10/11 x64 和可写的 **D 盘**，数据与缓存固定在 `D:\PlanEverydayData`；无需登录。代码采用 [MIT 许可证](LICENSE)，欢迎下载使用和改进。
 
 ## 界面预览
 
