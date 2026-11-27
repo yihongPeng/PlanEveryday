@@ -73,7 +73,13 @@ body[data-page="memory"][data-memory-mode="read"] #content{overflow:hidden;paddi
 .memory-toc-head span{font-size:12px;color:#63725d}
 .memory-view .memory-toc-head button{font-size:12px;padding:6px 8px;background:transparent;border-color:transparent;flex:none}
 .memory-toc ol{margin:0;padding:8px 8px 12px;list-style:none;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#c0cdb7 transparent}
-.memory-toc li{margin:0;padding-left:calc(var(--toc-depth,0)*12px)}
+.memory-toc li{display:grid;grid-template-columns:26px minmax(0,1fr);align-items:start;margin:0;padding-left:calc(var(--toc-depth,0)*12px)}
+.memory-toc li[hidden]{display:none}
+.memory-toc li>a{grid-column:2}
+.memory-view .memory-toc .memory-branch{width:26px;height:34px;padding:0;display:grid;place-items:center;background:transparent;border:0;color:#49624e;border-radius:5px}
+.memory-view .memory-toc .memory-branch:hover{background:#e1ead8}
+.memory-branch span{width:7px;height:7px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(-45deg)}
+.memory-branch[aria-expanded="true"] span{transform:translateY(-2px) rotate(45deg)}
 .memory-toc-depth-1{--toc-depth:1}.memory-toc-depth-2{--toc-depth:2}.memory-toc-depth-3{--toc-depth:3}.memory-toc-depth-4{--toc-depth:4}.memory-toc-depth-5{--toc-depth:5}
 .memory-toc a{display:block;min-height:34px;padding:7px 8px;border-left:2px solid transparent;border-radius:4px;color:#45604a;font-size:13px;line-height:1.55;text-decoration:none;overflow-wrap:anywhere}
 .memory-toc .memory-toc-depth-0>a{font-weight:600;color:#2e4c35}

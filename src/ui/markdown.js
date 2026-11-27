@@ -13,10 +13,25 @@
   if(token.type==='softbreak'||token.type==='hardbreak')return ' ';
   return token.type==='text'||token.type==='code_inline'?token.content:'';
  }).join('').trim();}
- function renderDocument(source){
+ for(const type of ['fence','code_block']){
+  const render=md.renderer.rules[type];
+  md.renderer.rules[type]=(tokens,index,...rest)=>{
+   const html=render(tokens,index,...rest),token=tokens[index];
+   return token.meta?.sourceMap?'<div data-source-start="'+token.map[0]+'" data-source-end="'+token.map[1]+'">'+html+'</div>':html;
+  };
+ }
+ function renderDocument(source,{sourceMap=false}={}){
   const env={},tokens=md.parse(String(source||''),env),headings=[],used=new Set();
   for(let i=0;i<tokens.length;i++){
-   const token=tokens[i];if(token.type!=='heading_open')continue;
+   const token=tokens[i];
+   if(sourceMap&&token.map){
+    if(token.type==='fence'||token.type==='code_block')token.meta={sourceMap:true};
+    else if(['heading_open','paragraph_open','list_item_open','tr_open','hr'].includes(token.type)){
+     token.attrSet('data-source-start',String(token.map[0]));
+     token.attrSet('data-source-end',String(token.map[1]));
+    }
+   }
+   if(token.type!=='heading_open')continue;
    const text=headingText(tokens[i+1]?.children)||'未命名标题';
    const slug=text.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}\p{M}\s_-]/gu,'').trim().replace(/\s+/g,'-')||'section';
    const base='memory-heading-'+slug;let id=base,suffix=2;
