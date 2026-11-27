@@ -31,8 +31,8 @@ async function visible(){return page.locator('#toast').isVisible();}
   });
   await page.addInitScript(()=>{let changed;window.planner={invoke:async(a,d)=>{const result=await window.toastInvoke(a,d);if(result.ok&&a!=='snapshot')queueMicrotask(()=>changed?.());return result;},onChange:fn=>changed=fn,onUpdate(){},onOpenTask(){}};});
   await page.goto(pathToFileURL(path.join(uiRoot,'src/ui/index.html')).href);
-  await page.locator('[data-view=projects]:visible').first().click();await page.locator('[data-project-open]').click();await page.locator('[data-project-tab=gantt]').click();
-  await page.locator(`[data-task-id="${task.id}"] .gantt-task-name`).click();
+  await page.locator('[data-view=projects]:visible').first().click();await page.locator('[data-project-open]').click();
+  await page.locator(`[data-task-id="${task.id}"] .gantt-task-bar .gantt-bar-move`).click();
   await schedule('2027-01-05','2027-01-07');await page.clock.fastForward(5100);
   const visibleAfterFiveSeconds=await visible();
   if(visibleAfterFiveSeconds){await page.clock.fastForward(4200);console.log(JSON.stringify({visibleAfterFiveSeconds,visibleAfterNineSeconds:await visible()}));}

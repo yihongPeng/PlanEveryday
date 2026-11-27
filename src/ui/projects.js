@@ -42,17 +42,76 @@
   const group=(name,title,items)=>items.length?`<section class="project-list-group"><button class="project-group-toggle" data-project-group="${name}" aria-expanded="${name==='active'||model.groups[name]||!!q}"><span aria-hidden="true">${name==='active'||model.groups[name]||q?'⌄':'›'}</span>${title}<small>${items.length}</small></button>${name==='active'||model.groups[name]||q?items.map(row).join(''):''}</section>`:'';
   return `<div class="project-list-toolbar"><label class="project-search"><span class="sr-only">搜索项目</span><input id="project-search" type="search" placeholder="搜索项目" value="${esc(model.query)}"></label><button class="primary-button" data-project-new>＋ 新建项目</button></div><div class="project-scroll" tabindex="-1">${group('active','进行中',list.filter(p=>!p.archivedAt&&p.status!=='completed'))}${group('completed','已完成',list.filter(p=>!p.archivedAt&&p.status==='completed'))}${group('archived','已归档',list.filter(p=>p.archivedAt))}${!list.length?`<div class="project-empty"><h2>${q?'没有找到匹配的项目':'还没有项目'}</h2><p>${q?'试试其他关键词，或查看全部项目。':'新建项目后，可以直接记录任务，再分阶段安排日期。'}</p><button class="secondary-button" ${q?'data-project-clear-search':'data-project-new'}>${q?'清除搜索':'新建项目'}</button></div>`:''}</div>`;
  }
- function taskGroup(item,list){
-  const s=session(),id=item?.id||'',key=id||'unassigned',all=list.filter(t=>(t.stageId||'')===id),visible=shownTasks(all),collapsed=!!s.collapsed?.[key]&&!filtered();
-  if(filtered()&&!visible.length)return '';
-  return `<section class="project-stage" data-project-stage="${esc(id)}"><div class="project-stage-head"><button class="project-stage-toggle" data-stage-toggle="${esc(key)}" aria-expanded="${!collapsed}"><span aria-hidden="true">${collapsed?'›':'⌄'}</span><span class="project-stage-name">${esc(item?.title||'未分阶段')}</span><small>${all.length&&all.every(t=>t.status==='done')?'阶段任务已完成':progress(all)}</small></button>${item?`<button class="project-stage-date" data-stage-schedule="${esc(id)}" aria-label="调整 ${esc(item.title)} 的日期">${dateRange(item.startDate,item.endDate)}</button><button class="project-stage-edit" data-stage-edit="${esc(id)}" aria-label="编辑阶段 ${esc(item.title)}" title="编辑阶段">⋯</button>`:''}</div>${!collapsed?`${item?.outcome?`<p class="project-stage-outcome">${esc(item.outcome)}</p>`:''}<div class="project-stage-tasks">${visible.length?visible.map(t=>`<div class="project-task-wrap ${s.multi?'is-selecting':''}">${s.multi?`<label class="project-select"><input type="checkbox" data-project-select="${esc(t.id)}" aria-label="选择 ${esc(t.title)}" ${model.selection.includes(t.id)?'checked':''}></label>`:''}${context.taskRow(t)}${outsideStage(t,item)?`<p class="project-outside">安排日期在阶段范围外 <button data-detail="${esc(t.id)}">调整任务</button><button data-stage-schedule="${esc(id)}">调整阶段</button></p>`:''}</div>`).join(''):`<p class="project-group-empty">${filtered()?'此阶段没有匹配的任务':'尚无任务'}</p>`}</div><button class="project-inline-add" data-stage-add-task="${esc(id)}">＋ 添加${item?'阶段':'项目'}任务</button>`:''}</section>`;
+ function startEntry(kind,stageId=''){
+  const s=session();s.quickByStage||={};
+  if(s.entry==='task')s.quickByStage[s.stageId||'']=s.quick;
+  s.entry=kind;s.stageId=stageId||'';
+  if(kind==='task')s.quick=s.quickByStage[s.stageId]||'';
+  if(s.gantt?.collapsed)s.gantt.collapsed=s.gantt.collapsed.filter(id=>id!==s.stageId);
+  draw();const field=context.container.querySelector('.sheet-entry');field?.scrollIntoView({block:'nearest',inline:'nearest'});field?.focus({preventScroll:true});
  }
+ function sheetControls(){
+  const s=session(), projectId=model.id;
+  s.titles||={};
+  if(s.quick&&!s.entry)s.entry='task';
+  function operation(fn){return act(fn);}
+  function name(item,kind){
+   const field=document.createElement('input');field.type='text';field.id='sheet-name-'+item.id;
+   field.className='sheet-name '+(kind==='task'?'gantt-task-name':'gantt-stage-name');field.maxLength=200;
+   field.setAttribute('aria-label',(kind==='stage'?'阶段名称':'任务名称')+' · '+item.title);
+   field.value=s.titles[item.id]?.value??item.title;field.title=item.title;
+   field.oninput=()=>{s.titles[item.id]={base:s.titles[item.id]?.base??item.title,value:field.value};persist();};
+   const save=()=>{const draft=s.titles[item.id];if(!draft||busy)return;
+    void operation(async()=>{
+     const title=draft.value.trim();if(!title)throw Error('名称不能为空');
+     if(title!==item.title){
+      if(draft.base!==item.title)throw Error('名称已在其他位置更改，请按 Esc 恢复后再编辑。');
+      await context.api(kind==='stage'?'updateStage':'update',{id:item.id,patch:{title}});
+     }
+     if(s.titles[item.id]===draft)delete s.titles[item.id];await refresh();
+    });
+   };
+   field.onkeydown=e=>{if(e.isComposing||e.keyCode===229)return;
+    if(e.key==='Enter'){e.preventDefault();save();}
+    if(e.key==='Escape'){e.stopPropagation();delete s.titles[item.id];field.value=item.title;persist();field.blur();}
+   };
+   field.onchange=()=>{if(field.isConnected&&!drawing)save();};
+   return field;
+  }
+  function entry(kind,stageId){
+   const active=(s.entry||'')===kind&&(kind==='stage'||s.stageId===(stageId||''));
+   if(!active){
+    const b=document.createElement('button');b.className='sheet-add';b.dataset.sheetAdd=stageId||kind;b.textContent=kind==='stage'?'＋ 添加阶段':'＋ 添加任务';b.onclick=()=>startEntry(kind,stageId);return b;
+   }
+   const field=document.createElement('input');field.className='sheet-entry';field.maxLength=200;
+   field.id=kind==='stage'?'sheet-new-stage':'project-task-title';
+   field.placeholder=kind==='stage'?'输入阶段名称':'输入任务名称';field.setAttribute('aria-label',field.placeholder);
+   field.value=kind==='stage'?(s.phaseTitle||''):(s.quick||'');
+   field.oninput=()=>{if(kind==='stage')s.phaseTitle=field.value;else s.quick=field.value;persist();};
+   field.onkeydown=e=>{
+    if(e.isComposing||e.keyCode===229)return;
+    if(e.key==='Escape'){e.stopPropagation();s.entry=null;if(kind==='stage')s.phaseTitle='';else s.quick='';draw();return;}
+    if(e.key!=='Enter')return;e.preventDefault();
+    if(kind==='task'){void operation(()=>addTask());return;}
+    void operation(async()=>{const title=field.value.trim();if(!title)throw Error('请填写阶段名称');
+     const day=today(),created=await context.api('addStage',{projectId,title,startDate:day,endDate:day});
+     s.phaseTitle='';s.entry='task';s.quick='';s.stageId=created.id||created;await refresh();
+     if(model.id===projectId)focus('project-task-title');
+    });
+   };return field;
+  }
+  return {name,entry,multi:s.multi,selection:model.selection,
+   needUngrouped:!s.stageId&&s.entry==='task',stageDetails:id=>openEditor('stage',id),
+   selectGroup:id=>{if(!s.entry){s.stageId=id||'';persist();}}};
+ }
+ let drawing=false;
  function renderProject(p){
   const list=projectTasks(),phases=projectStages(),s=session(),bounds=range(list,phases),canComplete=list.length>0&&list.every(t=>t.status==='done');
-  const projectActions='<button data-project-assign>归入已有任务</button><button data-stage-new>＋ 添加阶段</button>';
+  const showTools=s.tools||filtered()||s.multi;
   model.selection=model.selection.filter(id=>list.some(t=>t.id===id));
   if(s.stageId&&!phases.some(x=>x.id===s.stageId))s.stageId='';
-  return `<header class="project-header"><div class="project-breadcrumb"><button data-project-back>‹ 项目</button><span class="project-header-actions">${s.tab==='gantt'?projectActions:''}<button data-project-edit="${esc(p.id)}">项目设置</button></span></div><h2>${esc(p.title)}</h2><div class="project-summary"><span>${progress(list)}</span>${p.status==='completed'?'<span class="project-status">项目已完成</span>':''}${p.archivedAt?'<span class="project-status">已归档</span>':''}${p.targetDate?`<span>目标 ${dateText(p.targetDate)}</span>`:''}${bounds?`<span class="project-plan-range">当前计划 ${dateRange(bounds.start,bounds.end)}</span>`:''}</div>${p.outcome?`<details class="project-outcome" ${s.outcomeOpen?'open':''}><summary>成果说明</summary><p>${esc(p.outcome)}</p></details>`:''}${bounds&&p.targetDate&&bounds.end>p.targetDate?'<p class="project-range-note">当前安排晚于目标日</p>':''}${p.status!=='completed'&&canComplete?`<button class="project-complete" data-project-complete="${esc(p.id)}">全部任务已完成 · 完成项目</button>`:''}</header><div class="project-viewbar"><div class="project-tabs" role="tablist" aria-label="项目视图"><button role="tab" data-project-tab="tasks" aria-selected="${s.tab!=='gantt'}">任务</button><button role="tab" data-project-tab="gantt" aria-selected="${s.tab==='gantt'}">甘特图</button></div>${s.tab==='gantt'?'<div class="project-gantt-controls"></div>':`<div class="project-view-actions">${projectActions}</div>`}</div>${s.tab==='gantt'?'<div class="project-gantt-host"></div>':`<div class="project-task-tools"><form id="project-quick-form" class="project-quick-form"><label class="sr-only" for="project-task-title">新任务标题</label><input id="project-task-title" placeholder="记一件项目要做的事" autocomplete="off" value="${esc(s.quick||'')}" required><button class="primary-button" type="submit" data-project-add-task>添加</button></form><div class="project-add-meta"><label>添加到 <select id="project-new-stage">${stageOptions(s.stageId)}</select></label><span class="project-add-meta-actions"><span>默认未安排日期</span><button type="button" data-project-multi aria-pressed="${!!s.multi}">${s.multi?'结束多选':'多选'}</button></span></div><div class="project-task-filters"><label class="project-search"><span class="sr-only">搜索项目任务</span><input id="project-task-search" type="search" placeholder="搜索任务" value="${esc(s.query||'')}"></label><label class="sr-only" for="project-status-filter">任务状态</label><select id="project-status-filter"><option value="all">全部状态</option><option value="todo" ${s.status==='todo'?'selected':''}>待办</option><option value="done" ${s.status==='done'?'selected':''}>已完成</option></select><label class="sr-only" for="project-priority-filter">优先级</label><select id="project-priority-filter"><option value="all">全部优先级</option>${[['normal','普通'],['important','重要'],['urgent','紧急']].map(([k,label])=>`<option value="${k}" ${s.priority===k?'selected':''}>${label}</option>`).join('')}</select></div><p class="project-error" role="alert"></p>${model.selection.length?`<div class="project-selection-bar"><span>已选择 ${model.selection.length} 项</span><button data-project-move>归入阶段</button><button data-project-detach>移出项目</button><button data-project-selection-clear>取消选择</button></div>`:''}${filtered()?`<p class="project-filter-note">匹配 ${shownTasks(list).length} 项 · 项目共 ${list.length} 项 <button data-project-filter-clear>清除筛选</button></p>`:''}</div><div class="project-scroll" tabindex="-1">${phases.map(item=>taskGroup(item,list)).join('')}${taskGroup(null,list)}${filtered()&&!shownTasks(list).length?'<div class="project-empty"><p>没有匹配的任务</p><button data-project-filter-clear>清除筛选</button></div>':''}</div>`}`;
+  return `<header class="project-header"><div class="project-breadcrumb"><button data-project-back>‹ 项目</button><span class="project-header-actions"><button data-project-edit="${esc(p.id)}">项目设置</button></span></div><h2>${esc(p.title)}</h2><div class="project-summary"><span>${progress(list)}</span>${p.status==='completed'?'<span class="project-status">项目已完成</span>':''}${p.archivedAt?'<span class="project-status">已归档</span>':''}${p.targetDate?`<span>目标 ${dateText(p.targetDate)}</span>`:''}${bounds?`<span class="project-plan-range">当前计划 ${dateRange(bounds.start,bounds.end)}</span>`:''}</div>${p.outcome?`<details class="project-outcome" ${s.outcomeOpen?'open':''}><summary>成果说明</summary><p>${esc(p.outcome)}</p></details>`:''}${bounds&&p.targetDate&&bounds.end>p.targetDate?'<p class="project-range-note">当前安排晚于目标日</p>':''}${p.status!=='completed'&&canComplete?`<button class="project-complete" data-project-complete="${esc(p.id)}">全部任务已完成 · 完成项目</button>`:''}</header><div class="project-viewbar"><button class="primary-button sheet-new-task" data-sheet-new>＋ 任务</button><button data-stage-new>＋ 阶段</button><button data-sheet-tools aria-expanded="${!!showTools}">工具</button><div class="project-gantt-controls"></div></div>
+   ${showTools?`<div class="project-task-tools"><div class="sheet-tools"><button data-project-assign>归入已有任务</button><button data-project-multi aria-pressed="${!!s.multi}">${s.multi?"结束多选":"多选"}</button></div><div class="project-task-filters"><label class="project-search"><span class="sr-only">搜索项目任务</span><input id="project-task-search" type="search" placeholder="搜索任务" value="${esc(s.query||'')}"></label><label class="sr-only" for="project-status-filter">任务状态</label><select id="project-status-filter"><option value="all">全部状态</option><option value="todo" ${s.status==='todo'?'selected':''}>待办</option><option value="done" ${s.status==='done'?'selected':''}>已完成</option></select><label class="sr-only" for="project-priority-filter">优先级</label><select id="project-priority-filter"><option value="all">全部优先级</option>${[['normal','普通'],['important','重要'],['urgent','紧急']].map(([k,label])=>`<option value="${k}" ${s.priority===k?'selected':''}>${label}</option>`).join('')}</select></div><p class="project-error" role="alert"></p>${model.selection.length?`<div class="project-selection-bar"><span>已选择 ${model.selection.length} 项</span><button data-project-move>归入阶段</button><button data-project-detach>移出项目</button><button data-project-selection-clear>取消选择</button></div>`:''}${filtered()?`<p class="project-filter-note">匹配 ${shownTasks(list).length} 项 · 项目共 ${list.length} 项 <button data-project-filter-clear>清除筛选</button></p>`:''}</div>`:''}<p class="sheet-error" role="alert"></p><div class="project-gantt-host"></div>`;
  }
  function draft(kind,id){const key=`${kind}:${id||'new'}`;if(!model.drafts[key]){const item=kind==='project'?project(id):stage(id);model.drafts[key]={title:item?.title||'',outcome:item?.outcome||'',targetDate:item?.targetDate||'',startDate:item?.startDate||'',endDate:item?.endDate||''};}return model.drafts[key];}
  function dialogHead(title){return `<div class="project-dialog-head"><h2 id="project-dialog-title">${esc(title)}</h2><button type="button" data-project-dialog-close aria-label="关闭（保留草稿）">×</button></div>`;}
@@ -81,12 +140,13 @@
   const container=context.container,active=document.activeElement,focused=container.contains(active),focusId=focused?active.id:'',focusAttribute=focused?['data-project-select','data-project-assign-select','data-stage-toggle','data-project-tab','data-project-group'].find(name=>active.hasAttribute(name)):null,position=focusId&&typeof active.selectionStart==='number'?[active.selectionStart,active.selectionEnd]:null;
   const oldDialog=container.querySelector('#project-dialog'),dialogScroll=oldDialog?.scrollTop||0,assignScroll=container.querySelector('.project-assign-list')?.scrollTop||0,keepDialogScroll=oldDialog?.dataset.kind===model.dialog?.kind;
   if(model.id&&!project()){model.id=null;model.dialog=null;model.selection=[];}
-  container.classList.add('project-view');container.dataset.projectMode=model.id?'project':'list';container.dataset.projectId=model.id||'';container.dataset.projectTab=model.id?session().tab:'tasks';
-  container.innerHTML=(model.id?renderProject(project()):renderList())+renderDialog();
+  container.classList.add('project-view');container.dataset.projectMode=model.id?'project':'list';container.dataset.projectId=model.id||'';container.dataset.projectTab=model.id?'gantt':'';
+  drawing=true;
+  try{container.innerHTML=(model.id?renderProject(project()):renderList())+renderDialog();}finally{drawing=false;}
   const scroller=container.querySelector('.project-scroll');if(scroller)scroller.scrollTop=model.id?(session().scroll||0):model.listScroll;
-  if(model.id&&session().tab==='gantt'){
+  if(model.id){
    const gantt=window.ProjectGantt,host=container.querySelector('.project-gantt-host');
-   if(gantt)cleanupGantt=gantt.render({container:host,toolbarContainer:container.querySelector('.project-gantt-controls'),project:project(),stages:projectStages(),tasks:projectTasks(),session:session().gantt||(session().gantt={}),onTask:id=>context.openTask(typeof id==='string'?id:id.id),onStage:id=>openEditor('stage',typeof id==='string'?id:id.id),onSchedule:saveStageRange,onTaskSchedule:saveTaskRange,onSessionChange:persist})||(()=>{});
+   if(gantt)cleanupGantt=gantt.render({container:host,toolbarContainer:container.querySelector('.project-gantt-controls'),project:project(),stages:projectStages(),tasks:shownTasks(projectTasks()),sheet:sheetControls(),session:session().gantt||(session().gantt={}),onTask:id=>context.openTask(typeof id==='string'?id:id.id),onStage:id=>openEditor('stage',typeof id==='string'?id:id.id),onSchedule:saveStageRange,onTaskSchedule:saveTaskRange,onSessionChange:persist})||(()=>{});
    else host.innerHTML='<p class="project-help">甘特图暂时不可用，可通过阶段日期继续安排。</p>';
   }
   const dialog=container.querySelector('#project-dialog');if(dialog){dialog.showModal();dialog.addEventListener('cancel',e=>{e.preventDefault();if(!busy)closeDialog();},{signal:listeners?.signal});}
@@ -97,13 +157,13 @@
  function openEditor(kind,id=null){model.dialog={kind,id};draft(kind,id);draw();focus('project-title');}
  function closeDialog(){model.dialog=null;draw();}
  function confirmAction(title,message,action,label='确认',danger=false){model.dialog={kind:'confirm',title,message,action,label,danger,returnTo:model.dialog};draw();}
- function report(error){const message=error?.message||String(error);const target=context.container.querySelector('.project-dialog-error')||context.container.querySelector('.project-error');if(target)target.textContent=message;else context.toast(message);}
+ function report(error){const message=error?.message||String(error);const target=context.container.querySelector('.project-dialog-error')||context.container.querySelector('.sheet-error');if(target)target.textContent=message;else context.toast(message);}
  async function act(fn){if(busy)return;busy=true;context.container.setAttribute('aria-busy','true');context.container.querySelectorAll('[data-project-dialog-save],[data-project-add-task],[data-project-confirm]').forEach(x=>x.disabled=true);try{await fn();}catch(error){report(error);}finally{busy=false;context.container.removeAttribute('aria-busy');context.container.querySelectorAll('[data-project-dialog-save],[data-project-add-task],[data-project-confirm]').forEach(x=>x.disabled=false);}}
  async function refresh(){persist();await context.refresh();}
  async function addTask(reopen=false){
   const p=project(),s=session(),title=(s.quick||'').trim();if(!title)throw Error('先写下任务标题');if([...title].length>200)throw Error('任务标题最多 200 字');
   if(p.status==='completed'&&!reopen){confirmAction('重新打开项目并继续','添加待办会将这个已完成的项目恢复为进行中。取消后项目和任务都保持不变。',{kind:'addTask'},'重新打开并添加');return;}
-  const saved=s.quick;await context.api('add',{title,plannedDate:null,projectId:p.id,stageId:s.stageId||null,...(reopen?{reopenProject:true}:{})});if(s.quick===saved)s.quick='';model.dialog=null;await refresh();focus('project-task-title');
+  const saved=s.quick;await context.api('add',{title,plannedDate:today(),projectId:p.id,stageId:s.stageId||null,...(reopen?{reopenProject:true}:{})});if(s.quick===saved)s.quick='';model.dialog=null;await refresh();if(model.id===p.id)focus('project-task-title');
  }
  async function saveEditor(){
   const d=model.dialog,v=draft(d.kind,d.id),title=v.title.trim();if(!title||[...title].length>200)throw Error('名称需要 1–200 个字符');
@@ -172,9 +232,10 @@
   else if('projectEdit'in data)openEditor('project',data.projectEdit);
   else if('projectGroup'in data){model.groups[data.projectGroup]=!model.groups[data.projectGroup];draw();}
   else if('projectClearSearch'in data){model.query='';draw();focus('project-search');}
-  else if('projectTab'in data){session().tab=data.projectTab;draw();}
+  else if('sheetNew'in data)startEntry('task',session().stageId);
+  else if('sheetTools'in data){session().tools=!session().tools;draw();}
   else if('projectEnlarge'in data)void act(()=>context.api('maximize'));
-  else if('stageNew'in data)openEditor('stage');
+  else if('stageNew'in data)startEntry('stage');
   else if('stageEdit'in data)openEditor('stage',data.stageEdit);
   else if('stageToggle'in data){const s=session();s.collapsed||(s.collapsed={});s.collapsed[data.stageToggle]=!s.collapsed[data.stageToggle];draw();}
   else if('stageAddTask'in data){session().stageId=data.stageAddTask;draw();focus('project-task-title');}
@@ -221,16 +282,26 @@
  function attach(){
   listeners?.abort();listeners=new AbortController();const el=context.container,options={signal:listeners.signal};
   el.addEventListener('click',click,options);el.addEventListener('input',input,options);el.addEventListener('change',change,options);el.addEventListener('submit',submit,options);
-  el.addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.isComposing||e.keyCode===229))e.preventDefault();},options);
+  el.addEventListener('compositionstart',e=>{e.target.dataset.composing='true';},options);
+  el.addEventListener('compositionend',e=>{delete e.target.dataset.composing;},options);
   el.addEventListener('toggle',e=>{if(e.target.classList?.contains('project-outcome')){session().outcomeOpen=e.target.open;persist();}},{...options,capture:true});
   el.addEventListener('scroll',captureSession,{...options,capture:true});
+  el.addEventListener('click',event=>{
+   const opener=event.target.closest('.sheet-detail[data-detail]');
+   if(opener)session().returnTask=opener.dataset.detail;
+  },options);
+  document.addEventListener('click',event=>{
+   if(!model.id||!event.target.closest('#detail-close')||!session().returnTask)return;
+   const id=session().returnTask;delete session().returnTask;
+   queueMicrotask(()=>context.container.querySelector(`[data-detail="${CSS.escape(id)}"]`)?.focus({preventScroll:true}));
+  },options);
  }
  window.ProjectView={
-  render(options){if(context?.container!==options.container)dispose();context=options;attach();draw();},
+  render(options){if(context?.container!==options.container)dispose();context=options;attach();if(!context.container.querySelector(':focus[data-composing]'))draw();},
   dispose,captureSession,restoreSession,
   open(id){captureSession();model.id=id;model.selection=[];model.dialog=null;persist();},
   resetAfterRestore(){dispose();model=empty();persist();},
-  focusNew(){if(!context)return;if(model.id){session().tab='tasks';draw();focus('project-task-title');}else openEditor('project');},
-  focusSearch(){if(!context)return;if(model.id){session().tab='tasks';draw();focus('project-task-search');}else focus('project-search');}
+  focusNew(){if(!context)return;if(model.id){startEntry('task',session().stageId);}else openEditor('project');},
+  focusSearch(){if(!context)return;if(model.id){session().tools=true;draw();focus('project-task-search');}else focus('project-search');}
  };
 })();

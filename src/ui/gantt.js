@@ -27,7 +27,7 @@
   const expected = task => ({ plannedDate: task.plannedDate ?? null,
     plannedEndDate: task.plannedEndDate || task.plannedDate || null, updatedAt: task.updatedAt });
 
-  function render({ container, toolbarContainer, project, stages = [], tasks = [], session = {}, onTask = () => {},
+  function render({ container, toolbarContainer, project, stages = [], tasks = [], session = {}, sheet, onTask = () => {},
     onStage = () => {}, onSchedule = async () => {}, onTaskSchedule = async () => {}, onSessionChange = () => {} }) {
     if (!container || !project) return () => {};
     const phases = stages.filter(s => s.projectId === project.id).slice().sort((a, b) => (a.order || 0) - (b.order || 0));
@@ -52,6 +52,7 @@
     let viewport, inspector, feedback, live, toolbar, currentStart, currentEnd, dayWidth;
     let drag = null, frame = 0, stopped = false, saving = false, suppressClick = false;
     const root = node('section', 'project-gantt'); root.setAttribute('aria-label', `${project.title}的每日甘特图`);
+    root.classList.toggle('editable-sheet',!!sheet);
     container.replaceChildren(root);
     const notify = () => onSessionChange();
     const saveScroll = () => {
@@ -273,6 +274,32 @@
       const row = node('div', `gantt-row gantt-${kind}-row`), name = node('div', 'gantt-name'), track = node('div', 'gantt-track');
       markers(track); row.append(name, track); return { row, name, track };
     }
+    function dateCells(name,item,kind){
+      const [a,b]=bounds(item,kind);
+      for(const edge of ['start','end']){
+        const value=edge==='start'?a:b, label=edge==='start'?'开始日期':'结束日期';
+        const cell=button(value===null?'—':date(value).slice(5).replace('-','/'),'sheet-date',null,item.title+' · '+label);
+        cell.title=value===null?label:date(value);
+        cell.onclick=()=>{
+          const input=node('input','sheet-date sheet-date-input');input.type='date';input.value=value===null?'':date(value);
+          input.setAttribute('aria-label',label);cell.replaceWith(input);input.focus();
+          input.onkeydown=e=>{if(e.key==='Escape'){e.preventDefault();input.replaceWith(cell);cell.focus();}};
+          input.onblur=()=>{if(input.isConnected)input.replaceWith(cell);};
+          input.onchange=()=>{
+            const picked=ordinal(input.value);
+            if(picked!==null&&edge==='end'&&a!==null&&picked<a){message('结束日不能早于开始日',true);return;}
+            const start=picked===null?null:date(edge==='start'?picked:(a??picked));
+            const end=picked===null?null:date(edge==='end'?picked:Math.max(b??picked,picked));
+            if(kind==='task')void commitTask(item,candidate(item,start,end));else void commitStage(item,start,end);
+          };
+          try{input.showPicker();}catch{}
+        };
+        name.append(cell);
+      }
+    }
+    function addRow(kind,stageId){
+      const r=row('entry');r.name.append(sheet.entry(kind,stageId));return r.row;
+    }
     function taskRow(task, phase) {
       const r = row('task'), [a, b] = bounds(task, 'task'); r.row.dataset.taskId = task.id;
       r.row.classList.toggle('is-done', task.status === 'done'); r.row.classList.toggle('is-selected', session.selectedTaskId === task.id);
@@ -282,6 +309,16 @@
       if (phase?.startDate && a !== null && (a < ordinal(phase.startDate) || b > ordinal(phase.endDate))) {
         r.row.classList.add('is-outlier');
         const note = node('span', 'gantt-outlier-note', '范围外'); note.title = '任务日期在阶段范围外，可以保留或调整'; r.name.append(note);
+      }
+      if(sheet){
+        const done=button(task.status==='done'?'✓':'○','sheet-tick',null,'切换完成状态 · '+task.title);
+        done.dataset.complete=task.id;done.setAttribute('aria-pressed',String(task.status==='done'));
+        const details=button('详情','sheet-detail',null,'打开任务详情 · '+task.title);details.dataset.detail=task.id;
+        r.name.replaceChildren(done,sheet.name(task,'task'),details);
+        if(sheet.multi){const check=node('input','sheet-check');check.type='checkbox';check.dataset.projectSelect=task.id;
+          check.checked=sheet.selection.includes(task.id);check.setAttribute('aria-label','选择 '+task.title);r.name.prepend(check);}
+        r.name.onfocusin=()=>sheet.selectGroup(task.stageId);
+        dateCells(r.name,task,'task');
       }
       rangeBar(r.track, task, 'task'); return r.row;
     }
@@ -297,11 +334,17 @@
       const count = list.length ? `${list.filter(t => t.status === 'done').length}/${list.length} 项` : '尚无任务';
       title.title = `${stage.title} · ${count}`; r.name.append(toggle, title, node('span', 'gantt-stage-count', count));
       rangeBar(r.track, stage, 'stage'); rows.append(r.row);
-      if (!isCollapsed) list.forEach(task => rows.append(taskRow(task, stage)));
+      if(sheet){
+        const details=button('⋯','sheet-detail',()=>sheet.stageDetails(stage.id),'编辑阶段详情 · '+stage.title);details.dataset.stageEdit=stage.id;
+        r.name.replaceChildren(toggle,sheet.name(stage,'stage'),details);r.name.onfocusin=()=>sheet.selectGroup(stage.id);
+        dateCells(r.name,stage,'stage');
+      }
+      if (!isCollapsed){list.forEach(task => rows.append(taskRow(task, stage)));if(sheet)rows.append(addRow('task',stage.id));}
     }
     function calendar(rows) {
       const header = node('div', 'gantt-row gantt-header'), name = node('div', 'gantt-name gantt-name-heading');
       name.append(node('span', '', '阶段 / 任务'), node('span', 'gantt-duration', '天数'));
+      if(sheet){name.lastElementChild.remove();name.append(node('span','sheet-date','开始'),node('span','sheet-date','结束'));}
       const dates = node('div', 'gantt-calendar'), months = node('div', 'gantt-months'), days = node('div', 'gantt-dates');
       let month = null;
       for (let day = currentStart; day <= currentEnd; day++) {
@@ -353,11 +396,13 @@
       viewport = node('div', 'gantt-viewport'); viewport.tabIndex = 0; viewport.setAttribute('role', 'region');
       viewport.setAttribute('aria-label', `每日甘特图，${date(currentStart)}至${date(currentEnd)}，可横向滚动`);
       const rows = node('div', 'gantt-rows'); calendar(rows); phases.forEach(stage => stageRows(stage, rows));
-      if (ungrouped.length) {
+      if (ungrouped.length||sheet?.needUngrouped||(!phases.length&&sheet)) {
         const section = row('section'); section.name.textContent = `未分阶段 · ${ungrouped.length} 项`; rows.append(section.row);
         ungrouped.forEach(task => rows.append(taskRow(task)));
+        if(sheet)rows.append(addRow('task',''));
       }
-      if (!phases.length && !entries.length) { const empty = row('empty'); empty.name.textContent = '尚无阶段或任务'; rows.append(empty.row); }
+      if(sheet)rows.append(addRow('stage',''));
+      else if (!phases.length && !entries.length) { const empty = row('empty'); empty.name.textContent = '尚无阶段或任务'; rows.append(empty.row); }
       viewport.append(rows); root.append(viewport);
       inspector = node('form', 'gantt-inspector'); inspector.setAttribute('aria-label', '所选任务日期'); root.append(inspector);
       feedback = node('p', 'gantt-feedback'); feedback.setAttribute('role', 'status'); feedback.hidden = true;

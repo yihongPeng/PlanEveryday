@@ -56,8 +56,8 @@ let browser;
   await tick(); await page.screenshot({path:path.join(output,'today.png')});
   await page.locator('[data-view=projects]:visible').first().click();
   await page.locator('[data-project-open]').first().click();
-  await page.locator('[data-project-tab=gantt]').click(); await tick();
-  await page.locator(`[data-task-id="${selected.id}"] .gantt-task-name`).click();
+   await tick();
+  await page.locator(`[data-task-id="${selected.id}"] .sheet-name`).click();
   await page.locator('.gantt-viewport').evaluate((el,day)=>{
     const cell=el.querySelector(`[data-date="${day}"]`);
     el.scrollLeft+=cell.getBoundingClientRect().left-el.getBoundingClientRect().left-parseFloat(getComputedStyle(el.closest('.project-gantt')).getPropertyValue('--gantt-name-width'))-1;

@@ -120,3 +120,24 @@
   .gantt-feedback { max-height: 38px; overflow: auto; }
 }
 @media (prefers-reduced-motion: reduce) { .project-gantt * { scroll-behavior: auto !important; transition: none !important; } }
+.editable-sheet { --gantt-name-width: 396px; --gantt-row-height: 43px; --gantt-phase: #f0f4ef; }
+.editable-sheet .gantt-name { padding: 0 0 0 8px; gap: 2px; }
+.editable-sheet .gantt-name-heading>span:first-child { flex: 1; }
+.sheet-name,.sheet-entry { flex:1; min-width:0; width:0; border:1px solid transparent; border-radius:4px; background:transparent; color:inherit; padding:4px; height:32px; font:inherit; text-overflow:ellipsis; }
+.sheet-name:focus,.sheet-entry:focus { background:white; outline-offset:-2px !important; }
+.editable-sheet .is-done .sheet-name { text-decoration:line-through; color:#627266; }
+.editable-sheet .sheet-date { width:63px; flex:none; align-self:stretch; display:grid; place-items:center; border-left:1px solid var(--gantt-line); border-radius:0; padding:0; font:12px "Segoe UI",sans-serif; color:#55645a; }
+.editable-sheet .sheet-date-input { border:1px solid var(--gantt-moss); color:inherit; }
+.editable-sheet .gantt-task-row .gantt-name { padding-left:16px; }
+.sheet-tick,.sheet-detail { padding:0 3px; min-height:32px; flex:none; }
+.sheet-tick { color:#476a51; width:22px; }
+.sheet-detail { opacity:0; color:#4d6753; }
+.gantt-row:hover .sheet-detail,.gantt-row:focus-within .sheet-detail { opacity:1; }
+.editable-sheet .gantt-task-bar { top:11px; height:20px; background:#37654b; }
+.editable-sheet .gantt-task-bar.is-done { background:#a4b9a8; }
+.editable-sheet .sheet-add { min-height:32px; color:#536b56; padding:3px 8px; }
+.sheet-check { flex:none; width:14px; accent-color:#356247; }
+.sheet-error { color:#923f32; font-size:12px; margin:2px 0; }.sheet-error:empty {display:none}
+.sheet-tools {display:flex;gap:8px;align-items:center}.sheet-tools button,.project-viewbar>button{min-height:32px;white-space:nowrap}
+@media (max-width:900px){.editable-sheet {--gantt-name-width:180px}.editable-sheet .sheet-date{display:none}.editable-sheet .sheet-detail{opacity:1}.editable-sheet .gantt-task-row .gantt-name{padding-left:5px}}
+@media (max-width:540px){.editable-sheet{--gantt-name-width:150px}.project-viewbar .gantt-caption,.project-viewbar .gantt-density{display:none}.project-viewbar{gap:2px}.project-viewbar>button{padding:3px 5px}}
